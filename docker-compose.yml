@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16
+    container_name: postgres__training-api
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-training-api}
+      POSTGRES_USER: ${POSTGRES_USER:-training-api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-training-api}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-training-api}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build: ./backend
+    container_name: backend__training-api
+    ports:
+      - "${API_PORT:-8001}:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ./backend/config/.env
+    environment:
+      DB_HOST: db
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
