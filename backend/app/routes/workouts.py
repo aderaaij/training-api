@@ -22,6 +22,7 @@ def create_workout(payload: WorkoutCreate, db: DbSession):
         existing.total_distance = payload.total_distance
         existing.total_energy_burned = payload.total_energy_burned
         existing.source = payload.source
+        existing.plan_workout_id = payload.plan_workout_id
         existing.data = payload.data
         db.commit()
         db.refresh(existing)
@@ -36,6 +37,7 @@ def create_workout(payload: WorkoutCreate, db: DbSession):
         total_distance=payload.total_distance,
         total_energy_burned=payload.total_energy_burned,
         source=payload.source,
+        plan_workout_id=payload.plan_workout_id,
         data=payload.data,
     )
     db.add(workout)
@@ -50,6 +52,7 @@ def list_workouts(
     activity_type: str | None = None,
     start_after: datetime | None = None,
     start_before: datetime | None = None,
+    plan_workout_id: uuid.UUID | None = None,
     limit: int = Query(default=50, le=200),
     offset: int = 0,
 ):
@@ -61,6 +64,8 @@ def list_workouts(
         q = q.where(Workout.start_date >= start_after)
     if start_before:
         q = q.where(Workout.start_date <= start_before)
+    if plan_workout_id:
+        q = q.where(Workout.plan_workout_id == plan_workout_id)
 
     q = q.offset(offset).limit(limit)
     return db.scalars(q).all()
@@ -121,7 +126,7 @@ def get_workout_splits(workout_id: uuid.UUID, db: DbSession):
     workout = db.get(Workout, workout_id)
     if not workout:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found")
-    return workout.data.get("splits", [])
+    return workout.data.get("splits", workout.data.get("events", []))
 
 
 @router.get("/{workout_id}/heartrate")
@@ -129,7 +134,7 @@ def get_workout_heartrate(workout_id: uuid.UUID, db: DbSession):
     workout = db.get(Workout, workout_id)
     if not workout:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workout not found")
-    return workout.data.get("heartRateSamples", [])
+    return workout.data.get("heartRate", workout.data.get("heartRateSamples", []))
 
 
 @router.delete("/{workout_id}", status_code=status.HTTP_204_NO_CONTENT)

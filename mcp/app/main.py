@@ -8,6 +8,8 @@ from fastmcp import FastMCP
 from app.config import settings
 from app.tools.actions import actions_router
 from app.tools.feedback import feedback_router
+from app.tools.health_metrics import health_metrics_router
+from app.tools.plans import plans_router
 from app.tools.queue import queue_router
 from app.tools.workouts import workouts_router
 
@@ -70,6 +72,22 @@ mcp = FastMCP(
     4. Actions are applied the next time the user taps "Check for New Workouts" in the iPhone app.
     5. Use get_pending_actions to see what actions are pending.
 
+    Plan tools (training plan management):
+    - create_plan: Create a new training plan with metadata (goals, guardrails, phases)
+    - get_plan: Get a plan by ID with full metadata
+    - list_plans: List plans (filter by status, activity_type)
+    - update_plan: Update plan fields (name, status, metadata, end_date)
+    - get_plan_workouts: Get all queued workouts belonging to a plan
+
+    Workflow for creating a training plan:
+    1. Use create_plan to store the plan entity with goals, guardrails, phases, and
+       athlete context in the metadata blob. Get back the plan_id.
+    2. Use batch_create_workouts (or create_workout) with plan_id set on each workout
+       to link them to the plan.
+    3. When querying progress, use get_plan to load context, then get_plan_workouts
+       to see scheduled workouts, then cross-reference with recorded workouts via
+       plan_workout_id to compute completion rates and planned-vs-actual.
+
     Workflow for creating workouts:
     1. Use create_workout to build a structured workout composition. This queues it
        for the iPhone app, which syncs it to the Apple Watch via WorkoutKit.
@@ -77,6 +95,7 @@ mcp = FastMCP(
        iterations) → cooldown (optional). Each step has a goal (distance/time/open)
        and optional alerts (pace, heart rate zone, cadence, power).
     3. Use get_pending_workouts to review what's queued and waiting to sync.
+    4. Always pass plan_id when creating workouts that belong to a plan.
 
     Feedback tools (missed workout feedback from iOS app):
     - get_workout_feedback: Retrieve feedback entries for missed workouts (filter by date, action type)
@@ -94,6 +113,15 @@ mcp = FastMCP(
     - During weekly reviews, look for patterns: multiple "tired" → reduce volume, multiple "busy" →
       shift workout days, multiple "weather" → suggest indoor alternatives.
 
+    Health metrics tools (daily HealthKit data synced from iPhone):
+    - get_health_metrics: Query daily health metrics (sleep, resting HR, HRV, weight, VO2Max,
+      steps, active energy, body fat, lean body mass, respiratory rate, SpO2)
+
+    Use health metrics to correlate recovery/readiness with training patterns. For example:
+    - Low HRV + poor sleep → suggest easier workout or rest day
+    - Declining resting HR trend → improving cardiovascular fitness
+    - Weight/body composition trends alongside training volume
+
     Common activity types: running, cycling, swimming, walking, hiking
     Distance is in meters, duration in seconds, energy in kcal.
     Speed alerts use metersPerSecond (e.g., 4:00/km pace ≈ 4.17 m/s, 5:00/km ≈ 3.33 m/s).
@@ -104,6 +132,8 @@ mcp.mount(workouts_router)
 mcp.mount(queue_router)
 mcp.mount(actions_router)
 mcp.mount(feedback_router)
+mcp.mount(health_metrics_router)
+mcp.mount(plans_router)
 
 logger.info(f"Training MCP server initialized. API URL: {settings.training_api_url}")
 

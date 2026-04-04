@@ -40,6 +40,7 @@ def create_queue_item(payload: QueueItemCreate, db: DbSession):
         title=payload.title,
         description=payload.description,
         workout_data=payload.workout_data,
+        plan_id=payload.plan_id,
     )
     db.add(item)
     db.commit()
@@ -56,6 +57,7 @@ def create_queue_items_batch(payload: list[QueueItemCreate], db: DbSession):
             title=p.title,
             description=p.description,
             workout_data=p.workout_data,
+            plan_id=p.plan_id,
         )
         db.add(item)
         items.append(item)
@@ -79,6 +81,8 @@ def update_queue_item(item_id: uuid.UUID, payload: QueueItemUpdate, db: DbSessio
         item.description = payload.description
     if payload.workout_data is not None:
         item.workout_data = payload.workout_data
+    if payload.plan_id is not None:
+        item.plan_id = payload.plan_id
 
     db.commit()
     db.refresh(item)
@@ -137,9 +141,11 @@ def app_get_pending(db: DbSession):
 
 
 @workout_queue_router.delete("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
-def app_delete_queue_item(item_id: uuid.UUID, db: DbSession):
+def app_mark_queue_item_synced(item_id: uuid.UUID, db: DbSession):
+    """Mark a queue item as synced to Apple Watch (previously deleted it)."""
     item = db.get(WorkoutQueue, item_id)
     if not item:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Queue item not found")
-    db.delete(item)
+    item.status = "synced"
+    item.fetched_at = item.fetched_at or datetime.now(timezone.utc)
     db.commit()

@@ -11,6 +11,7 @@ class QueueItemCreate(BaseModel):
     title: str
     description: str | None = None
     workout_data: dict | None = Field(default=None, alias="workoutData")
+    plan_id: uuid.UUID | None = Field(default=None, alias="planId")
 
 
 class QueueItemRead(BaseModel):
@@ -21,6 +22,7 @@ class QueueItemRead(BaseModel):
     title: str
     description: str | None
     workout_data: dict | None
+    plan_id: uuid.UUID | None
     status: str
     created_at: datetime
     fetched_at: datetime | None
@@ -34,6 +36,7 @@ class QueueItemUpdate(BaseModel):
     title: str | None = None
     description: str | None = None
     workout_data: dict | None = Field(default=None, alias="workoutData")
+    plan_id: uuid.UUID | None = Field(default=None, alias="planId")
 
 
 class QueueStatusUpdate(BaseModel):

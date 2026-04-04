@@ -77,6 +77,17 @@ class TrainingClient:
         """Get a single workout by ID."""
         return await self._request("GET", f"/api/workouts/{workout_id}")
 
+    async def delete_workout(self, workout_id: str) -> dict:
+        """Delete a workout by ID."""
+        self._ensure_configured()
+        url = f"{self.base_url}/api/workouts/{workout_id}"
+        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
+            response = await http_client.request("DELETE", url, headers=self.headers)
+            if response.status_code == 404:
+                raise ValueError(f"Workout not found: {workout_id}")
+            response.raise_for_status()
+            return {"deleted": workout_id}
+
     async def get_workout_splits(self, workout_id: str) -> list | dict:
         """Get splits for a workout."""
         return await self._request("GET", f"/api/workouts/{workout_id}/splits")
@@ -117,6 +128,7 @@ class TrainingClient:
         title: str,
         description: str | None = None,
         workout_data: dict | None = None,
+        plan_id: str | None = None,
     ) -> list | dict:
         """Create a new queue item. Sends camelCase keys as required by the API."""
         body: dict[str, Any] = {
@@ -127,6 +139,8 @@ class TrainingClient:
             body["description"] = description
         if workout_data is not None:
             body["workoutData"] = workout_data
+        if plan_id is not None:
+            body["planId"] = plan_id
         return await self._request("POST", "/api/queue", json=body)
 
     async def update_queue_item(self, item_id: str, **fields: Any) -> list | dict:
@@ -137,6 +151,7 @@ class TrainingClient:
             "title": "title",
             "description": "description",
             "workout_data": "workoutData",
+            "plan_id": "planId",
         }
         for key, value in fields.items():
             if value is not None and key in key_map:
@@ -230,6 +245,46 @@ class TrainingClient:
     async def create_queue_items_batch(self, items: list[dict]) -> list | dict:
         """Create multiple queue items in one request."""
         return await self._request("POST", "/api/queue/batch", json=items)
+
+    async def create_plan(self, plan: dict) -> list | dict:
+        """Create a training plan."""
+        return await self._request("POST", "/api/plans", json=plan)
+
+    async def list_plans(
+        self,
+        status: str | None = None,
+        activity_type: str | None = None,
+    ) -> list | dict:
+        """List training plans."""
+        params: dict[str, Any] = {}
+        if status:
+            params["status"] = status
+        if activity_type:
+            params["activity_type"] = activity_type
+        return await self._request("GET", "/api/plans", params=params)
+
+    async def get_plan(self, plan_id: str) -> list | dict:
+        """Get a single plan by ID."""
+        return await self._request("GET", f"/api/plans/{plan_id}")
+
+    async def update_plan(self, plan_id: str, updates: dict) -> list | dict:
+        """Update a plan."""
+        return await self._request("PATCH", f"/api/plans/{plan_id}", json=updates)
+
+    async def get_plan_workouts(self, plan_id: str) -> list | dict:
+        """Get all queued workouts for a plan."""
+        return await self._request("GET", f"/api/plans/{plan_id}/workouts")
+
+    async def get_health_metrics(
+        self,
+        start_date: str,
+        end_date: str | None = None,
+    ) -> list | dict:
+        """Get daily health metrics for a date range."""
+        params: dict[str, Any] = {"start_date": start_date}
+        if end_date:
+            params["end_date"] = end_date
+        return await self._request("GET", "/api/health/metrics", params=params)
 
 
 # Singleton instance

@@ -133,6 +133,26 @@ async def get_workout_activities(workout_id: str) -> dict | list:
 
 
 @workouts_router.tool
+async def delete_workout(workout_id: str) -> dict | list:
+    """Delete a recorded workout by ID.
+
+    This permanently removes a HealthKit workout record from the database.
+    The workout can be re-synced from the iPhone if needed.
+
+    Args:
+        workout_id: UUID of the workout to delete.
+
+    Returns:
+        Confirmation with the deleted workout ID.
+    """
+    try:
+        return await client.delete_workout(workout_id)
+    except Exception as e:
+        logger.exception(f"Error in delete_workout: {e}")
+        return {"error": str(e)}
+
+
+@workouts_router.tool
 async def get_training_summary(
     activity_type: str | None = None,
     period: str = "month",

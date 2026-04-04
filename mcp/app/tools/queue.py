@@ -66,6 +66,7 @@ async def create_workout(
     warmup: dict | None = None,
     cooldown: dict | None = None,
     description: str | None = None,
+    plan_id: str | None = None,
 ) -> dict | list:
     """
     Create a structured workout composition and queue it for the Apple Watch.
@@ -100,6 +101,7 @@ async def create_workout(
         warmup: Optional warmup step with same goal/alert structure as an interval step.
         cooldown: Optional cooldown step with same goal/alert structure as an interval step.
         description: Optional text description of the workout.
+        plan_id: Optional UUID of the training plan this workout belongs to.
 
     Returns:
         The created queue item object.
@@ -164,6 +166,7 @@ async def create_workout(
             title=display_name,
             description=description,
             workout_data=workout_data,
+            plan_id=plan_id,
         )
     except Exception as e:
         logger.exception(f"Error in create_workout: {e}")
@@ -181,6 +184,7 @@ async def update_queued_workout(
     warmup: dict | None = None,
     cooldown: dict | None = None,
     description: str | None = None,
+    plan_id: str | None = None,
 ) -> dict | list:
     """
     Update an existing queued workout. Only provided fields are changed.
@@ -199,6 +203,7 @@ async def update_queued_workout(
         warmup: New warmup step (use {} to clear, null to leave unchanged).
         cooldown: New cooldown step (use {} to clear, null to leave unchanged).
         description: New text description.
+        plan_id: UUID of the training plan to assign this workout to.
 
     Returns:
         The updated queue item object.
@@ -242,6 +247,7 @@ async def update_queued_workout(
             title=display_name,
             description=description,
             workout_data=existing_data if updated else None,
+            plan_id=plan_id,
         )
     except Exception as e:
         logger.exception(f"Error in update_queued_workout: {e}")
