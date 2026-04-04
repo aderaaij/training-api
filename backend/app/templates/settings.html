@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Settings — Training API{% endblock %}
+{% block content %}
+<div class="grid">
+    <div class="card">
+        <h2>API Key</h2>
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <div class="key-display" id="api-key-display" style="flex: 1;">{{ masked_key }}</div>
+            <button id="api-key-toggle" onclick="toggleKey()" style="
+                background: var(--surface-hover); border: 1px solid var(--border); color: var(--text-muted);
+                padding: 0.4rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
+            ">Show</button>
+            <button onclick="copyKey()" style="
+                background: var(--surface-hover); border: 1px solid var(--border); color: var(--text-muted);
+                padding: 0.4rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
+            ">Copy</button>
+        </div>
+        <div class="sub" style="margin-top: 0.5rem;">Used for Bearer token authentication on all endpoints.</div>
+        <script>
+            const maskedKey = "{{ masked_key }}";
+            const fullKey = "{{ full_key }}";
+            let revealed = false;
+            function toggleKey() {
+                revealed = !revealed;
+                document.getElementById('api-key-display').textContent = revealed ? fullKey : maskedKey;
+                document.getElementById('api-key-toggle').textContent = revealed ? 'Hide' : 'Show';
+            }
+            function copyKey() {
+                navigator.clipboard.writeText(fullKey).then(() => {
+                    const btn = event.target;
+                    btn.textContent = 'Copied';
+                    setTimeout(() => btn.textContent = 'Copy', 1500);
+                });
+            }
+        </script>
+    </div>
+    <div class="card">
+        <h2>Database</h2>
+        <div class="metric-row"><span class="label">Status</span><span>{{ "Connected" if db_ok else "Disconnected" }}</span></div>
+        <div class="metric-row"><span class="label">Host</span><span>{{ db_host }}</span></div>
+        <div class="metric-row"><span class="label">Database</span><span>{{ db_name }}</span></div>
+    </div>
+    <div class="card">
+        <h2>Service</h2>
+        <div class="metric-row"><span class="label">Version</span><span>{{ version }}</span></div>
+        <div class="metric-row"><span class="label">Port</span><span>8001</span></div>
+        <div class="metric-row"><span class="label">Funnel</span><span>ardencore.tail38e03e.ts.net:8443</span></div>
+    </div>
+    <div class="card">
+        <h2>Endpoints</h2>
+        <table>
+            <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+            <tbody>
+                {% for ep in endpoints %}
+                <tr>
+                    <td><span class="badge badge-{% if ep.method == 'GET' %}green{% elif ep.method == 'POST' %}blue{% elif ep.method == 'PATCH' %}orange{% elif ep.method == 'DELETE' %}red{% else %}muted{% endif %}">{{ ep.method }}</span></td>
+                    <td style="font-family: monospace; font-size: 0.8rem;">{{ ep.path }}</td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">{{ ep.desc }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

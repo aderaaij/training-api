@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Plan — Training API{% endblock %}
+{% block content %}
+{% if plan %}
+<div class="grid">
+    <div class="card card-wide">
+        <h2>{{ plan.status | upper }}</h2>
+        <div class="value" style="font-size: 1.5rem;">{{ plan.name }}</div>
+        <div class="sub">{{ plan.start_date }} — {{ plan.end_date or "ongoing" }} &middot; {{ plan.activity_type }}</div>
+        {% if plan.description %}
+        <div class="sub" style="margin-top: 0.5rem; color: var(--text); font-size: 0.85rem;">{{ plan.description }}</div>
+        {% endif %}
+        <div class="progress-bar" style="margin-top: 1rem;">
+            <div class="fill" style="width: {{ plan.completion_pct }}%"></div>
+        </div>
+        <div class="sub">{{ plan.completed_count }}/{{ plan.total_count }} workouts completed ({{ plan.completion_pct }}%)</div>
+    </div>
+
+    {% if phases %}
+    <div class="card">
+        <h2>Phases</h2>
+        {% for phase in phases %}
+        <div class="metric-row">
+            <span class="label">
+                {{ phase.name }}
+                {% if phase.is_current %}<span class="badge badge-blue">current</span>{% endif %}
+            </span>
+            <span>
+                {% if phase.volume_target_km %}{{ phase.volume_target_km }} km/wk{% endif %}
+                <span style="color: var(--text-muted); font-size: 0.8rem;">W{{ phase.weeks | join(',') }}</span>
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if goals %}
+    <div class="card">
+        <h2>Goals</h2>
+        {% for goal in goals %}
+        <div class="metric-row">
+            {% if goal.type == "decision" %}
+            <span>{{ goal.description }}</span>
+            {% else %}
+            <span class="label">{{ goal.type | replace("_", " ") | title }}</span>
+            <span>{{ goal.target }} {{ goal.unit }}{% if goal.by_week %} by W{{ goal.by_week }}{% endif %}</span>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if guardrails %}
+    <div class="card">
+        <h2>Guardrails</h2>
+        {% for g in guardrails %}
+        <div class="metric-row"><span>{{ g }}</span></div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="card card-wide">
+        <h2>Workouts</h2>
+        {% if workouts %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in workouts %}
+                <tr>
+                    <td>{{ w.title }}</td>
+                    <td>{{ w.scheduled_date or "—" }}</td>
+                    <td>
+                        {% if w.status == "completed" %}
+                        <span class="badge badge-green">completed</span>
+                        {% elif w.status == "synced" %}
+                        <span class="badge badge-blue">synced</span>
+                        {% elif w.status == "fetched" %}
+                        <span class="badge badge-orange">fetched</span>
+                        {% elif w.status == "pending" %}
+                        <span class="badge badge-yellow">pending</span>
+                        {% else %}
+                        <span class="badge badge-muted">{{ w.status }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No workouts in this plan.</div>
+        {% endif %}
+    </div>
+</div>
+{% else %}
+<div class="card">
+    <div class="empty">No active plan.</div>
+</div>
+{% endif %}
+{% endblock %}

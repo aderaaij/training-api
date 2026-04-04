@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Training API{% endblock %}
+{% block content %}
+<div class="grid">
+    <div class="card">
+        <h2>Workouts</h2>
+        <div class="value">{{ stats.total_workouts }}</div>
+        <div class="sub">{{ stats.recent_workouts }} in the last 7 days</div>
+    </div>
+    <div class="card">
+        <h2>Queue</h2>
+        <div class="value">{{ stats.queue_pending }}</div>
+        <div class="sub">pending &middot; {{ stats.queue_synced }} synced &middot; {{ stats.queue_completed }} completed</div>
+    </div>
+    <div class="card">
+        <h2>Health Metrics</h2>
+        <div class="value">{{ stats.health_days }}</div>
+        <div class="sub">days tracked</div>
+    </div>
+
+    {% if plan %}
+    <div class="card">
+        <h2>Active Plan</h2>
+        <div class="value" style="font-size: 1.3rem;">{{ plan.name }}</div>
+        <div class="sub">{{ plan.start_date }} — {{ plan.end_date or "ongoing" }} &middot; {{ plan.activity_type }}</div>
+        <div class="progress-bar">
+            <div class="fill" style="width: {{ plan.completion_pct }}%"></div>
+        </div>
+        <div class="sub">{{ plan.completed_count }}/{{ plan.total_count }} workouts &middot; {{ plan.completion_pct }}%</div>
+    </div>
+    {% endif %}
+
+    {% if latest_health %}
+    <div class="card">
+        <h2>Latest Health ({{ latest_health.date }})</h2>
+        {% if latest_health.resting_heart_rate %}
+        <div class="metric-row"><span class="label">Resting HR</span><span>{{ "%.0f"|format(latest_health.resting_heart_rate) }} bpm</span></div>
+        {% endif %}
+        {% if latest_health.hrv_sdnn %}
+        <div class="metric-row"><span class="label">HRV (SDNN)</span><span>{{ "%.1f"|format(latest_health.hrv_sdnn) }} ms</span></div>
+        {% endif %}
+        {% if latest_health.sleep_duration %}
+        <div class="metric-row"><span class="label">Sleep</span><span>{{ "%.1f"|format(latest_health.sleep_duration / 3600) }} hrs</span></div>
+        {% endif %}
+        {% if latest_health.weight %}
+        <div class="metric-row"><span class="label">Weight</span><span>{{ "%.1f"|format(latest_health.weight) }} kg</span></div>
+        {% endif %}
+        {% if latest_health.steps %}
+        <div class="metric-row"><span class="label">Steps</span><span>{{ "{:,}".format(latest_health.steps) }}</span></div>
+        {% endif %}
+        {% if latest_health.vo2_max %}
+        <div class="metric-row"><span class="label">VO2 Max</span><span>{{ "%.1f"|format(latest_health.vo2_max) }}</span></div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card card-wide">
+        <h2>Recent Workouts</h2>
+        {% if recent_workouts %}
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Type</th>
+                    <th>Duration</th>
+                    <th>Distance</th>
+                    <th>Energy</th>
+                    <th>Source</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for w in recent_workouts %}
+                <tr>
+                    <td>{{ w.start_date.strftime('%b %d, %H:%M') }}</td>
+                    <td>{{ w.activity_type }}</td>
+                    <td>{{ "%.0f"|format(w.duration / 60) if w.duration else "—" }} min</td>
+                    <td>{{ "%.2f"|format(w.total_distance / 1000) if w.total_distance else "—" }} km</td>
+                    <td>{{ "%.0f"|format(w.total_energy_burned) if w.total_energy_burned else "—" }} kcal</td>
+                    <td style="color: var(--text-muted); font-size: 0.8rem;">{{ w.source.split('.')[-1][:12] if w.source else "—" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <div class="empty">No workouts recorded yet.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

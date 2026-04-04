@@ -1,9 +1,20 @@
 from fastapi import APIRouter, Depends, FastAPI
 
+from fastapi.responses import RedirectResponse
+
 from app.auth import verify_api_key
-from app.routes import actions, feedback, health, health_metrics, inventory, plans, queue, workouts
+from app.routes import actions, dashboard, feedback, health, health_metrics, inventory, plans, queue, workouts
 
 app = FastAPI(title="Training API", version="0.1.0")
+
+# Dashboard — no auth (local network only)
+app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+
+
+@app.get("/", include_in_schema=False)
+def root_redirect():
+    return RedirectResponse(url="/dashboard")
+
 
 # Health endpoint — no auth
 app.include_router(health.router, prefix="/api", tags=["health"])
