@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, FastAPI
 from fastapi.responses import RedirectResponse
 
 from app.auth import verify_api_key
-from app.routes import actions, dashboard, feedback, health, health_metrics, inventory, plans, queue, workouts
+from app.routes import actions, dashboard, feedback, health, health_metrics, inventory, plan_notes, plans, queue, workouts
 
 app = FastAPI(title="Training API", version="0.1.0")
 
@@ -29,4 +29,5 @@ api_router.include_router(workouts.router, prefix="/workouts", tags=["workouts"]
 api_router.include_router(queue.router, prefix="/queue", tags=["queue"])
 api_router.include_router(health_metrics.router, prefix="/health/metrics", tags=["health-metrics"])
 api_router.include_router(plans.router, prefix="/plans", tags=["plans"])
+api_router.include_router(plan_notes.router, prefix="/plan-notes", tags=["plan-notes"])
 app.include_router(api_router)

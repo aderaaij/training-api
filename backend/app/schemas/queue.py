@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 
 class QueueItemCreate(BaseModel):
@@ -27,6 +27,17 @@ class QueueItemRead(BaseModel):
     created_at: datetime
     fetched_at: datetime | None
     completed_at: datetime | None
+
+    @computed_field
+    @property
+    def scheduled_date(self) -> datetime | None:
+        raw = (self.workout_data or {}).get("scheduledDate")
+        if not isinstance(raw, str):
+            return None
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
 
 
 class QueueItemUpdate(BaseModel):

@@ -275,6 +275,58 @@ class TrainingClient:
         """Get all queued workouts for a plan."""
         return await self._request("GET", f"/api/plans/{plan_id}/workouts")
 
+    async def get_plan_context(
+        self,
+        plan_id: str | None = None,
+        since_days: int = 60,
+        limit: int = 40,
+    ) -> list | dict:
+        """Get the aggregated plan-continuity payload for an LLM conversation."""
+        params: dict[str, Any] = {"since_days": since_days, "limit": limit}
+        if plan_id:
+            params["plan_id"] = plan_id
+        return await self._request("GET", "/api/plan-notes/context", params=params)
+
+    async def list_plan_notes(
+        self,
+        plan_id: str | None = None,
+        kind: str | None = None,
+        conversation_id: str | None = None,
+        since_days: int | None = None,
+        include_expired: bool = False,
+        limit: int = 50,
+    ) -> list | dict:
+        """List plan notes with optional filters."""
+        params: dict[str, Any] = {"limit": limit, "include_expired": include_expired}
+        if plan_id:
+            params["plan_id"] = plan_id
+        if kind:
+            params["kind"] = kind
+        if conversation_id:
+            params["conversation_id"] = conversation_id
+        if since_days is not None:
+            params["since_days"] = since_days
+        return await self._request("GET", "/api/plan-notes", params=params)
+
+    async def create_plan_note(self, note: dict) -> list | dict:
+        """Create a plan note."""
+        return await self._request("POST", "/api/plan-notes", json=note)
+
+    async def update_plan_note(self, note_id: str, updates: dict) -> list | dict:
+        """Update a plan note."""
+        return await self._request("PATCH", f"/api/plan-notes/{note_id}", json=updates)
+
+    async def delete_plan_note(self, note_id: str) -> dict:
+        """Delete a plan note."""
+        self._ensure_configured()
+        url = f"{self.base_url}/api/plan-notes/{note_id}"
+        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
+            response = await http_client.request("DELETE", url, headers=self.headers)
+            if response.status_code == 404:
+                raise ValueError(f"Note not found: {note_id}")
+            response.raise_for_status()
+            return {"deleted": note_id}
+
     async def get_health_metrics(
         self,
         start_date: str,

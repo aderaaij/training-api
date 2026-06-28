@@ -98,9 +98,9 @@ def update_queue_status(item_id: uuid.UUID, payload: QueueStatusUpdate, db: DbSe
     now = datetime.now(timezone.utc)
     item.status = payload.status
 
-    if payload.status == "fetched":
+    if payload.status == "fetched" and item.fetched_at is None:
         item.fetched_at = now
-    elif payload.status == "completed":
+    elif payload.status == "completed" and item.completed_at is None:
         item.completed_at = now
 
     db.commit()

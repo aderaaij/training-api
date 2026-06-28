@@ -9,6 +9,7 @@ from app.config import settings
 from app.tools.actions import actions_router
 from app.tools.feedback import feedback_router
 from app.tools.health_metrics import health_metrics_router
+from app.tools.plan_notes import plan_notes_router
 from app.tools.plans import plans_router
 from app.tools.queue import queue_router
 from app.tools.workouts import workouts_router
@@ -28,6 +29,20 @@ mcp = FastMCP(
 
     Provides access to workout tracking data and a training queue for planning workouts.
     This is a single-user system — no user discovery step is needed.
+
+    CONTINUITY (read this first):
+    The user discusses their training across MANY separate conversations. To make
+    each one feel like a continuation rather than a cold start:
+      1. At the START of any training-related conversation, call `get_plan_context`
+         BEFORE answering. It returns the active plan, recent decisions/preferences/
+         constraints/life-context, and a `continuity_hint` directive. Read the hint.
+      2. DURING the conversation, call `append_plan_note` without being asked when
+         the user reveals: a preference ("I prefer", "from now on"), a decision
+         ("let's drop", "I've decided"), life context (travel, illness, sleep
+         debt, work stress), a hard constraint, or a non-obvious insight.
+         Err on the side of saving — short notes are cheap.
+      3. Use a stable `conversation_id` for all notes saved in one conversation
+         so future-you can see what was discussed together.
 
     Available tools:
 
@@ -78,6 +93,14 @@ mcp = FastMCP(
     - list_plans: List plans (filter by status, activity_type)
     - update_plan: Update plan fields (name, status, metadata, end_date)
     - get_plan_workouts: Get all queued workouts belonging to a plan
+
+    Plan continuity tools (cross-conversation memory — see CONTINUITY note above):
+    - get_plan_context: Active plan + recent notes + continuity hint. Call FIRST.
+    - append_plan_note: Save a decision/preference/constraint/life_context/observation/blocker.
+      Call without being asked when the user reveals plan-relevant info.
+    - list_plan_notes: Targeted retrieval (filter by kind, conversation, etc.)
+    - update_plan_note: Correct or refine an existing note.
+    - delete_plan_note: Remove an incorrect/duplicate note (prefer update or expires_at).
 
     Workflow for creating a training plan:
     1. Use create_plan to store the plan entity with goals, guardrails, phases, and
@@ -134,6 +157,7 @@ mcp.mount(actions_router)
 mcp.mount(feedback_router)
 mcp.mount(health_metrics_router)
 mcp.mount(plans_router)
+mcp.mount(plan_notes_router)
 
 logger.info(f"Training MCP server initialized. API URL: {settings.training_api_url}")
 

@@ -23,6 +23,8 @@ def create_workout(payload: WorkoutCreate, db: DbSession):
         existing.total_energy_burned = payload.total_energy_burned
         existing.source = payload.source
         existing.plan_workout_id = payload.plan_workout_id
+        existing.effort_score = payload.effort_score
+        existing.estimated_effort_score = payload.estimated_effort_score
         existing.data = payload.data
         db.commit()
         db.refresh(existing)
@@ -38,6 +40,8 @@ def create_workout(payload: WorkoutCreate, db: DbSession):
         total_energy_burned=payload.total_energy_burned,
         source=payload.source,
         plan_workout_id=payload.plan_workout_id,
+        effort_score=payload.effort_score,
+        estimated_effort_score=payload.estimated_effort_score,
         data=payload.data,
     )
     db.add(workout)

@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 _KNOWN_FIELDS = {
     "id", "activityType", "startDate", "endDate",
     "duration", "totalDistance", "totalEnergyBurned", "source", "data",
-    "planWorkoutId",
+    "planWorkoutId", "effortScore", "estimatedEffortScore",
 }
 
 
@@ -24,6 +24,8 @@ class WorkoutCreate(BaseModel):
     total_energy_burned: float | None = Field(default=None, alias="totalEnergyBurned")
     source: str | None = None
     plan_workout_id: uuid.UUID | None = Field(default=None, alias="planWorkoutId")
+    effort_score: float | None = Field(default=None, alias="effortScore", ge=1, le=10)
+    estimated_effort_score: float | None = Field(default=None, alias="estimatedEffortScore", ge=1, le=10)
     data: dict = Field(default_factory=dict)
 
     @model_validator(mode="before")
@@ -53,6 +55,8 @@ class WorkoutRead(BaseModel):
     total_energy_burned: float | None
     source: str | None
     plan_workout_id: uuid.UUID | None
+    effort_score: float | None
+    estimated_effort_score: float | None
     data: dict
     created_at: datetime
     updated_at: datetime
@@ -70,6 +74,8 @@ class WorkoutList(BaseModel):
     total_energy_burned: float | None
     source: str | None
     plan_workout_id: uuid.UUID | None
+    effort_score: float | None
+    estimated_effort_score: float | None
     created_at: datetime
 
 

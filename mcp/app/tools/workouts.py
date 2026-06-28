@@ -32,7 +32,21 @@ async def get_recent_runs(
 
     Returns:
         List of workout objects with fields: id, activity_type, start_date, end_date,
-        duration, total_distance, total_energy_burned, source, data, created_at, updated_at.
+        duration, total_distance, total_energy_burned, source, plan_workout_id,
+        effort_score, estimated_effort_score, created_at.
+
+        - effort_score: User-rated post-workout RPE (1–10) from the Apple Watch
+          effort prompt. The user's perception of the workout — trust it as the
+          primary signal. May be null when the workout predates iOS 18 / watchOS 11
+          or the user dismissed the prompt.
+        - estimated_effort_score: Apple's algorithmic RPE estimate (1–10) computed
+          from heart rate / activity. Useful for cross-referencing against
+          effort_score; a large gap (e.g. user 8 vs. estimate 5) can indicate
+          non-cardiovascular load (heat, sleep debt, dehydration, illness, life
+          stress) that HR-based estimates miss — worth surfacing during weekly
+          review when it appears repeatedly. May be null when no estimate exists.
+
+        Treat null as "no signal," not "low effort."
     """
     try:
         return await client.list_workouts(
@@ -57,6 +71,12 @@ async def get_workout_detail(workout_id: str) -> dict | list:
     Returns:
         Workout object with all fields including the nested data object
         (which may contain splits, heart rate samples, etc.).
+
+        Includes effort_score (user-rated RPE 1–10 from Apple Watch effort prompt;
+        primary signal of perceived effort) and estimated_effort_score (Apple's
+        algorithmic RPE estimate 1–10). A large gap between the two can indicate
+        non-cardiovascular load (heat, sleep debt, illness, stress) that HR-based
+        estimates miss. Treat null as "no signal," not "low effort."
     """
     try:
         return await client.get_workout(workout_id)
