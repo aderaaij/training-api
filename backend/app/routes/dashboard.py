@@ -11,6 +11,8 @@ from app.models.health_metrics import DailyHealthMetrics
 from app.models.plan import Plan
 from app.models.queue import WorkoutQueue
 from app.models.workout import Workout
+from app.routes.schedule import build_calendar
+from app.schedule_utils import cycle_end_date
 
 router = APIRouter()
 templates = Jinja2Templates(directory=Path(__file__).parent.parent / "templates")
@@ -159,10 +161,13 @@ def plan_view(request: Request, db: DbSession):
         guardrails = metadata.get("guardrails", [])
 
         for q in queue_items:
-            inv = inventory.get(str(q.id))
             scheduled_date = None
-            if inv and inv.year and inv.month and inv.day:
-                scheduled_date = date(inv.year, inv.month, inv.day).isoformat()
+            if q.scheduled_date:
+                scheduled_date = q.scheduled_date.date().isoformat()
+            else:
+                inv = inventory.get(str(q.id))
+                if inv and inv.year and inv.month and inv.day:
+                    scheduled_date = date(inv.year, inv.month, inv.day).isoformat()
             workouts.append({
                 "title": q.title,
                 "status": q.status,
@@ -179,6 +184,65 @@ def plan_view(request: Request, db: DbSession):
         "goals": goals,
         "guardrails": guardrails,
         "workouts": workouts,
+    })
+
+
+@router.get("/schedule")
+def schedule_view(request: Request, db: DbSession):
+    db_ok = _check_db(db)
+    today = date.today()
+    start_monday = today - timedelta(days=today.weekday())
+    num_weeks = 5
+    end = start_monday + timedelta(days=num_weeks * 7 - 1)
+
+    calendar = build_calendar(db, start_monday, end)
+    by_date: dict[str, list] = {}
+    for e in calendar["entries"]:
+        by_date.setdefault(e["date"], []).append(e)
+
+    weeks = []
+    for w in range(num_weeks):
+        wk_monday = start_monday + timedelta(days=7 * w)
+        days = []
+        for i in range(7):
+            d = wk_monday + timedelta(days=i)
+            days.append({
+                "dow": d.strftime("%a"),
+                "day_num": d.day,
+                "is_today": d == today,
+                "is_past": d < today,
+                "entries": by_date.get(d.isoformat(), []),
+            })
+        weeks.append({"label": wk_monday.strftime("%b %d").lstrip("0"), "days": days})
+
+    conflict_count = sum(1 for e in calendar["entries"] if e["conflict"]) // 2
+
+    # Active recurring cycles + their horizon (the "when do I renew?" signal)
+    cycles = []
+    active_plans = db.scalars(
+        select(Plan).where(Plan.status == "active").order_by(Plan.created_at.desc())
+    ).all()
+    for plan in active_plans:
+        schedule = (plan.metadata_ or {}).get("schedule")
+        if not schedule:
+            continue
+        cycle_end = cycle_end_date(schedule)
+        cycles.append({
+            "name": plan.name,
+            "activity_type": plan.activity_type,
+            "days": schedule.get("days", {}),
+            "weeks": schedule.get("weeks"),
+            "end_date": cycle_end,
+            "days_left": (cycle_end - today).days if cycle_end else None,
+        })
+
+    return templates.TemplateResponse(request, "schedule.html", {
+        "active_page": "schedule",
+        "db_ok": db_ok,
+        "weeks": weeks,
+        "conflict_count": conflict_count,
+        "cycles": cycles,
+        "has_entries": bool(calendar["entries"]),
     })
 
 
@@ -218,6 +282,10 @@ def settings_view(request: Request, db: DbSession):
         {"method": "PATCH", "path": "/api/plans/{id}", "desc": "Update plan"},
         {"method": "DELETE", "path": "/api/plans/{id}", "desc": "Delete plan"},
         {"method": "GET", "path": "/api/plans/{id}/workouts", "desc": "Plan workouts"},
+        {"method": "GET", "path": "/api/plans/{id}/schedule", "desc": "Get recurring schedule + conflicts"},
+        {"method": "PUT", "path": "/api/plans/{id}/schedule", "desc": "Set recurring schedule"},
+        {"method": "DELETE", "path": "/api/plans/{id}/schedule", "desc": "Clear recurring schedule"},
+        {"method": "GET", "path": "/api/schedule/calendar", "desc": "Unified run + strength calendar"},
         {"method": "POST", "path": "/api/health/metrics", "desc": "Bulk upsert health metrics"},
         {"method": "GET", "path": "/api/health/metrics", "desc": "Query health metrics"},
     ]

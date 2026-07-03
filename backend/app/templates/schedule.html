@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Schedule — Training API{% endblock %}
+{% block content %}
+<style>
+    .cal-week {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 6px;
+        margin-bottom: 6px;
+    }
+    .cal-day {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        padding: 0.4rem 0.45rem;
+        min-height: 76px;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+    .cal-day.past { opacity: 0.5; }
+    .cal-day.today { border-color: var(--accent); }
+    .cal-day.conflict { border-color: var(--red); }
+    .cal-dow {
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--text-muted);
+        display: flex;
+        justify-content: space-between;
+    }
+    .cal-dow .num { color: var(--text); font-weight: 600; }
+    .pill {
+        font-size: 0.72rem;
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+        line-height: 1.25;
+        display: block;
+    }
+    .pill-run { background: rgba(74, 158, 255, 0.15); color: var(--accent); }
+    .pill-strength { background: rgba(167, 139, 250, 0.18); color: #c4b5fd; }
+    .pill.done { opacity: 0.6; }
+    .pill .rid { color: var(--text-muted); font-size: 0.62rem; }
+    .legend { display: flex; gap: 1rem; font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .legend .pill { display: inline-block; }
+    .banner {
+        background: rgba(248, 113, 113, 0.12);
+        border: 1px solid rgba(248, 113, 113, 0.4);
+        color: var(--red);
+        border-radius: 6px;
+        padding: 0.6rem 0.85rem;
+        font-size: 0.82rem;
+        margin-bottom: 1rem;
+    }
+</style>
+
+{% if conflict_count %}
+<div class="banner">⚠ {{ conflict_count }} day{{ "s" if conflict_count != 1 }} have a run and a strength session on the same date. Ask Claude to move one if that's not intended.</div>
+{% endif %}
+
+{% if cycles %}
+<div class="grid" style="margin-bottom: 1rem;">
+    {% for c in cycles %}
+    <div class="card">
+        <h2>{{ c.activity_type }} cycle</h2>
+        <div class="value" style="font-size: 1.2rem;">{{ c.name }}</div>
+        <div class="sub">
+            {{ c.weeks }} weeks &middot;
+            {% for dow, ref in c.days.items() %}{{ dow | capitalize }}: {{ ref.title }}{% if not loop.last %} · {% endif %}{% endfor %}
+        </div>
+        {% if c.end_date %}
+        <div class="sub" style="margin-top: 0.5rem;">
+            Ends {{ c.end_date }}
+            {% if c.days_left is not none %}
+                {% if c.days_left < 0 %}<span class="badge badge-red">cycle over — renew</span>
+                {% elif c.days_left <= 7 %}<span class="badge badge-orange">{{ c.days_left }}d left</span>
+                {% else %}<span class="badge badge-muted">{{ c.days_left }}d left</span>{% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="card card-wide">
+    <h2>Next 5 weeks</h2>
+    {% if has_entries %}
+    {% for week in weeks %}
+    <div class="cal-week">
+        {% for day in week.days %}
+        {% set has_conflict = day.entries | selectattr("conflict") | list | length > 0 %}
+        <div class="cal-day {% if day.is_past %}past{% endif %} {% if day.is_today %}today{% endif %} {% if has_conflict %}conflict{% endif %}">
+            <div class="cal-dow"><span>{{ day.dow }}</span><span class="num">{{ day.day_num }}</span></div>
+            {% for e in day.entries %}
+            <span class="pill pill-{{ e.kind }} {% if e.completed %}done{% endif %}"
+                  title="{{ e.planName or e.title }}">
+                {% if e.kind == "strength" %}{% if e.completed %}✓{% else %}🏋{% endif %}{% else %}{% if e.completed %}✓{% else %}🏃{% endif %}{% endif %}
+                {{ e.title }}
+            </span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endfor %}
+    <div class="legend">
+        <span><span class="pill pill-run">🏃 run</span> Apple Watch queue</span>
+        <span><span class="pill pill-strength">🏋 strength</span> Hevy routine</span>
+        <span>✓ completed &middot; <span style="color: var(--red);">red border</span> = conflict</span>
+    </div>
+    {% else %}
+    <div class="empty">Nothing scheduled in the next 5 weeks. Ask Claude to build a plan or a strength cycle.</div>
+    {% endif %}
+</div>
+{% endblock %}
