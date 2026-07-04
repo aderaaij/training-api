@@ -50,14 +50,20 @@ The API runs on port **8001**. Auth is via `Authorization: Bearer <API_KEY>` hea
 ## Database
 
 Models live in `backend/app/models/`. Key tables:
-- **Workout** - recorded workouts with splits, heart rate, JSONB metadata
-- **WorkoutQueue** - structured workouts queued for Apple Watch sync (status: pending/fetched/synced/completed)
-- **Plan** - training plans with JSONB metadata (goals, guardrails, phases)
+- **Workout** - recorded workouts with splits, heart rate, JSONB metadata. Aggregates *all* HealthKit workouts by source — running (Apple), Strava rides, Bend flexibility, Garmin, and **Hevy strength** (source `com.hevyapp.hevy`, activity `traditionalStrength`). There is **no Hevy API integration**; strength sessions arrive via HealthKit sync like everything else.
+- **WorkoutQueue** - structured workouts queued for Apple Watch sync (status: pending/fetched/synced/completed). `scheduled_date` is a first-class indexed column (kept in sync with `workout_data.scheduledDate`, which the iOS app still reads) so the schedule is queryable and can be conflict-checked.
+- **Plan** - training plans with JSONB metadata (goals, guardrails, phases). Metadata may also hold a **`schedule`** — a recurring weekly cadence `{startDate, weeks, days: {mon: {title, routineId}, ...}, time, timezone}`. Used for strength/Hevy cycles: each weekday slot references a **Hevy routine** (opaque `routineId` + title; the LLM looks these up via the separate `hevy-mcp` and passes them in — this API never resolves them). Strength slots are plan markers only; they are **not** pushed to the Apple Watch. Completed strength sessions auto-match to schedule dates via the `traditionalStrength` workouts Hevy syncs in.
 - **PlanNote** - cross-conversation continuity notes (decisions, preferences, life context). LLM reads via `get_plan_context`, writes via `append_plan_note`.
 - **DailyHealthMetrics** - daily HealthKit data (sleep, HR, HRV, weight, VO2Max, etc.)
 - **WorkoutAction** - edit/delete actions for on-device workouts
 - **WorkoutFeedback** - missed workout feedback
 - **WorkoutInventory** - current on-device workout snapshot
+
+### Scheduling / calendar
+- `GET/PUT/DELETE /api/plans/{id}/schedule` — read/set/clear a plan's recurring cadence; the response resolves it to concrete dated `sessions` and flags any that **collide with a queued run** (`warnings`, surfaced not blocked). Weekday keys validated against `mon..sun`.
+- `GET /api/schedule/calendar?from=&to=` — unified timeline merging scheduled runs (queue) + strength sessions (active plan schedules), each with a `conflict` flag. Shared by the dashboard **Schedule** page and the MCP.
+- Expansion/conflict logic is in `backend/app/schedule_utils.py` (pure) + `routes/schedule.py`.
+- MCP tools (`mcp/app/tools/plans.py`): `set_strength_schedule`, `get_plan_schedule`, `clear_plan_schedule`, `get_training_calendar`. Workflow: pull routines from `hevy-mcp` → `get_training_calendar` to see runs → `set_strength_schedule` placing sessions on free days.
 
 When adding/changing models, create a migration with `make create_migration m="description"`. Migrations auto-run on container startup.
 

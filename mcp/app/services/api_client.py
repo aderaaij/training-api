@@ -275,6 +275,31 @@ class TrainingClient:
         """Get all queued workouts for a plan."""
         return await self._request("GET", f"/api/plans/{plan_id}/workouts")
 
+    async def get_plan_schedule(self, plan_id: str) -> list | dict:
+        """Get a plan's recurring schedule, resolved to dates with conflicts."""
+        return await self._request("GET", f"/api/plans/{plan_id}/schedule")
+
+    async def set_plan_schedule(self, plan_id: str, schedule: dict) -> list | dict:
+        """Set (replace) a plan's recurring weekly schedule."""
+        return await self._request("PUT", f"/api/plans/{plan_id}/schedule", json=schedule)
+
+    async def clear_plan_schedule(self, plan_id: str) -> list | dict:
+        """Remove a plan's recurring schedule."""
+        return await self._request("DELETE", f"/api/plans/{plan_id}/schedule")
+
+    async def get_training_calendar(
+        self,
+        date_from: str | None = None,
+        date_to: str | None = None,
+    ) -> list | dict:
+        """Get the unified run + strength calendar over a date window."""
+        params: dict[str, Any] = {}
+        if date_from:
+            params["from"] = date_from
+        if date_to:
+            params["to"] = date_to
+        return await self._request("GET", "/api/schedule/calendar", params=params)
+
     async def get_plan_context(
         self,
         plan_id: str | None = None,

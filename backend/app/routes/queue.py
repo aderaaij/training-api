@@ -11,6 +11,17 @@ from app.schemas.queue import QueueItemCreate, QueueItemRead, QueueItemUpdate, Q
 router = APIRouter()
 
 
+def _scheduled_date_from_data(workout_data: dict | None) -> datetime | None:
+    """Parse scheduledDate out of a workout composition, if present."""
+    raw = (workout_data or {}).get("scheduledDate")
+    if not isinstance(raw, str):
+        return None
+    try:
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
 @router.get("/pending", response_model=list[QueueItemRead])
 def get_pending(db: DbSession):
     q = select(WorkoutQueue).where(WorkoutQueue.status == "pending").order_by(WorkoutQueue.created_at)
@@ -41,6 +52,7 @@ def create_queue_item(payload: QueueItemCreate, db: DbSession):
         description=payload.description,
         workout_data=payload.workout_data,
         plan_id=payload.plan_id,
+        scheduled_date=payload.scheduled_date or _scheduled_date_from_data(payload.workout_data),
     )
     db.add(item)
     db.commit()
@@ -58,6 +70,7 @@ def create_queue_items_batch(payload: list[QueueItemCreate], db: DbSession):
             description=p.description,
             workout_data=p.workout_data,
             plan_id=p.plan_id,
+            scheduled_date=p.scheduled_date or _scheduled_date_from_data(p.workout_data),
         )
         db.add(item)
         items.append(item)
@@ -81,6 +94,9 @@ def update_queue_item(item_id: uuid.UUID, payload: QueueItemUpdate, db: DbSessio
         item.description = payload.description
     if payload.workout_data is not None:
         item.workout_data = payload.workout_data
+        item.scheduled_date = _scheduled_date_from_data(payload.workout_data)
+    if payload.scheduled_date is not None:
+        item.scheduled_date = payload.scheduled_date
     if payload.plan_id is not None:
         item.plan_id = payload.plan_id
 

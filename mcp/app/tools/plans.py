@@ -157,3 +157,125 @@ async def get_plan_workouts(plan_id: str) -> dict | list:
     except Exception as e:
         logger.exception(f"Error in get_plan_workouts: {e}")
         return {"error": str(e)}
+
+
+@plans_router.tool
+async def set_strength_schedule(
+    plan_id: str,
+    start_date: str,
+    weeks: int,
+    days: dict[str, dict],
+    time: str | None = None,
+    timezone: str | None = None,
+) -> dict | list:
+    """Set a recurring weekly schedule on a plan — which routine runs on which
+    weekday, for a number of weeks.
+
+    Use this for strength / Hevy cycles: the schedule references Hevy routines
+    by id + title (get them from the hevy-mcp first). These sessions are plan
+    markers only — they are NOT pushed to the Apple Watch (that's for running
+    interval workouts). Completed strength sessions auto-match by date via the
+    HealthKit `traditionalStrength` workouts that Hevy already syncs in.
+
+    IMPORTANT — avoid conflicts: call `get_training_calendar` first to see
+    scheduled runs, and place strength days on free weekdays. The response also
+    returns a `warnings` list flagging any day where a strength session lands on
+    the same date as a scheduled run (surfaced, not blocked — you decide).
+
+    Args:
+        plan_id: UUID of the plan this cycle belongs to (create one first via
+            create_plan with activity_type "strength").
+        start_date: First week's anchor date (YYYY-MM-DD).
+        weeks: How many weeks the cycle runs (1–52).
+        days: Map of weekday -> routine reference. Weekday keys are lowercase
+            three-letter: "mon","tue","wed","thu","fri","sat","sun". Each value
+            is {"title": str, "routineId": str|null}. Example:
+            {
+                "mon": {"title": "Lower", "routineId": "hevy-abc"},
+                "wed": {"title": "Upper Push", "routineId": "hevy-def"},
+                "fri": {"title": "Deadlifts + Pull", "routineId": "hevy-ghi"}
+            }
+        time: Optional default time of day "HH:MM".
+        timezone: Optional IANA timezone (e.g. "Europe/Lisbon").
+
+    Returns:
+        The resolved schedule: concrete dated `sessions` (each with a `conflict`
+        flag) and a `warnings` list for run collisions.
+    """
+    try:
+        schedule: dict[str, Any] = {
+            "startDate": start_date,
+            "weeks": weeks,
+            "days": days,
+        }
+        if time is not None:
+            schedule["time"] = time
+        if timezone is not None:
+            schedule["timezone"] = timezone
+        return await client.set_plan_schedule(plan_id, schedule)
+    except Exception as e:
+        logger.exception(f"Error in set_strength_schedule: {e}")
+        return {"error": str(e)}
+
+
+@plans_router.tool
+async def get_plan_schedule(plan_id: str) -> dict | list:
+    """Get a plan's recurring schedule expanded into concrete dated sessions.
+
+    Args:
+        plan_id: UUID of the plan.
+
+    Returns:
+        {plan_id, schedule, sessions[], warnings[]} — sessions carry a
+        `conflict` flag where they collide with a queued run.
+    """
+    try:
+        return await client.get_plan_schedule(plan_id)
+    except Exception as e:
+        logger.exception(f"Error in get_plan_schedule: {e}")
+        return {"error": str(e)}
+
+
+@plans_router.tool
+async def clear_plan_schedule(plan_id: str) -> dict | list:
+    """Remove a plan's recurring weekly schedule.
+
+    Args:
+        plan_id: UUID of the plan.
+
+    Returns:
+        The plan's now-empty schedule response.
+    """
+    try:
+        return await client.clear_plan_schedule(plan_id)
+    except Exception as e:
+        logger.exception(f"Error in clear_plan_schedule: {e}")
+        return {"error": str(e)}
+
+
+@plans_router.tool
+async def get_training_calendar(
+    date_from: str | None = None,
+    date_to: str | None = None,
+) -> dict | list:
+    """Get the unified training calendar: scheduled runs (Apple Watch queue)
+    merged with recurring strength sessions (from active plan schedules), with
+    same-day conflicts flagged.
+
+    Call this before scheduling strength days so you can place them on days that
+    don't already have a run.
+
+    Args:
+        date_from: Window start (YYYY-MM-DD). Defaults to today.
+        date_to: Window end (YYYY-MM-DD). Defaults to today + 28 days.
+
+    Returns:
+        {from, to, entries[]} where each entry has: date, kind ("run" or
+        "strength"), title, activityType, status, planId, planName, routineId,
+        completed, conflict.
+    """
+    try:
+        return await client.get_training_calendar(date_from=date_from, date_to=date_to)
+    except Exception as e:
+        logger.exception(f"Error in get_training_calendar: {e}")
+        return {"error": str(e)}
