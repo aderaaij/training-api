@@ -41,6 +41,7 @@ class UserOut(_CamelModel):
 
 class LoginResponse(_CamelModel):
     token: str
+    token_id: uuid.UUID  # this session's token id — for revoke-on-logout
     user: UserOut
 
 
@@ -76,7 +77,8 @@ def login(request: Request, body: LoginRequest, db: DbSession) -> LoginResponse:
     token = ApiToken(user_id=user.id, token_hash=hash_token(raw), name=(body.device_name or "").strip()[:100])
     db.add(token)
     db.commit()
-    return LoginResponse(token=raw, user=UserOut.model_validate(user))
+    db.refresh(token)
+    return LoginResponse(token=raw, token_id=token.id, user=UserOut.model_validate(user))
 
 
 @router.get("/me", response_model=MeResponse)

@@ -176,7 +176,13 @@ def get_owned(db: Session, model: type[T], obj_id: UUID, user: User) -> T:
 
 **Tier 3 — claude.ai (OAuth): explicitly out of scope.** Would require mapping OAuth identity → training-api user through the auth-proxy layer. Only worth it if a family member actually wants claude.ai access; revisit then.
 
-## Phase 5 — iOS app contract (separate repo; handoff doc like `app-scheduling-handoff.md`)
+## Phase 5 — iOS app contract → handoff doc written: `docs/app-login-handoff.md` (2026-07-15)
+
+Login screen contract is documented and the backend is ready. `POST /api/auth/login` now also returns `tokenId` so the app can revoke its own token on logout. The app already accepts an API key, so login is a UX improvement (username/password → token) rather than a hard requirement — a per-user token pasted into the existing field already works. Awaiting the app-side implementation (separate repo).
+
+Original plan below.
+
+
 
 - New: settings screen takes **server URL + username + password** → `POST /api/auth/login` (send `deviceName`) → store token in Keychain. Everything else is unchanged (same `Bearer` header on every call).
 - Handle `401` anywhere → clear token, return to login (covers revocation + deactivation).
