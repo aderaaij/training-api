@@ -15,7 +15,7 @@ Built with FastAPI, PostgreSQL, and SQLAlchemy. Includes an optional MCP (Model 
 - **Training plans** — Create and manage training plans with goals, guardrails, phases, and athlete context stored as flexible JSONB metadata
 - **Health metrics** — Bulk upsert daily HealthKit metrics (sleep, HR, HRV, weight, VO2Max, steps, body composition) with date-based upsert
 - **Plan-workout linking** — Link queued workouts to plans (`plan_id`) and recorded workouts to their planned counterpart (`plan_workout_id`) for planned-vs-actual analysis
-- **Dashboard** — Built-in web dashboard at `/dashboard` with overview stats, plan progress, health metrics, and API key management
+- **Multi-user** — Username/password accounts with per-device API tokens (`POST /api/auth/login`); all data is scoped per user
 - **MCP server** — Let AI assistants query your training data, create workouts and plans, and correlate health metrics via natural language
 
 ## Quick Start
@@ -46,7 +46,7 @@ ENVIRONMENT=LOCAL
 make up        # or: docker compose up -d
 ```
 
-The API will be available at `http://localhost:8001`. Database migrations run automatically on startup. A web dashboard is available at `http://localhost:8001/dashboard`.
+The API will be available at `http://localhost:8001`. Database migrations run automatically on startup.
 
 ### 3. Verify
 
@@ -56,7 +56,7 @@ curl http://localhost:8001/api/health
 
 ## API
 
-All endpoints (except health) require a `Bearer` token in the `Authorization` header matching the `API_KEY` you configured.
+All endpoints except `/api/health` and `/api/auth/login` require a `Bearer` token in the `Authorization` header. The configured `API_KEY` works as the initial admin's token; additional per-user tokens are issued by `POST /api/auth/login` (username + password).
 
 ### Workouts
 
@@ -125,11 +125,7 @@ All endpoints (except health) require a `Bearer` token in the `Authorization` he
 
 ### Dashboard
 
-| Endpoint | Description |
-|----------|-------------|
-| `/dashboard` | Overview — stats, plan progress, recent workouts, health metrics |
-| `/dashboard/plan` | Active plan detail — phases, goals, guardrails, workout list |
-| `/dashboard/settings` | API key (show/copy), database info, endpoint reference |
+The built-in web dashboard is currently **disabled** — `/dashboard` returns 404. It was unauthenticated and is being replaced by a separate authenticated frontend. The Jinja2 templates and route handlers remain in `backend/app/templates/` and `backend/app/routes/dashboard.py` for reference.
 
 ## MCP Server (optional)
 

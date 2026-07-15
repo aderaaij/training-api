@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, FastAPI
-from fastapi.responses import RedirectResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.auth import get_current_user
 from app.rate_limit import limiter
-from app.routes import actions, auth, dashboard, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
+from app.routes import actions, auth, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
 
 app = FastAPI(title="Training API", version="0.1.0")
 
@@ -13,13 +12,17 @@ app = FastAPI(title="Training API", version="0.1.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# Dashboard — no auth (local network only)
-app.include_router(dashboard.router, prefix="/dashboard", tags=["dashboard"])
+# The server-rendered dashboard is DISABLED. It was unauthenticated and served
+# personal data (health metrics, workouts, plans) over the public Tailscale
+# Funnel, and is being replaced by a separate authenticated frontend. The routes
+# and templates remain in app/routes/dashboard.py + app/templates/ for reference
+# — do NOT re-mount without auth, it would re-expose that data. See
+# docs/multi-user-plan.md (Phase 3).
 
 
 @app.get("/", include_in_schema=False)
-def root_redirect():
-    return RedirectResponse(url="/dashboard")
+def root():
+    return {"service": "training-api", "status": "ok"}
 
 
 # Health endpoint — no auth
