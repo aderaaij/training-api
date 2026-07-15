@@ -298,7 +298,6 @@ def settings_view(request: Request, db: DbSession):
         "active_page": "settings",
         "db_ok": db_ok,
         "masked_key": masked_key,
-        "full_key": api_key,
         "db_host": db_host,
         "db_name": db_name,
         "version": "0.1.0",

@@ -4,35 +4,12 @@
 <div class="grid">
     <div class="card">
         <h2>API Key</h2>
-        <div style="display: flex; align-items: center; gap: 0.5rem;">
-            <div class="key-display" id="api-key-display" style="flex: 1;">{{ masked_key }}</div>
-            <button id="api-key-toggle" onclick="toggleKey()" style="
-                background: var(--surface-hover); border: 1px solid var(--border); color: var(--text-muted);
-                padding: 0.4rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
-            ">Show</button>
-            <button onclick="copyKey()" style="
-                background: var(--surface-hover); border: 1px solid var(--border); color: var(--text-muted);
-                padding: 0.4rem 0.75rem; border-radius: 4px; cursor: pointer; font-size: 0.8rem; white-space: nowrap;
-            ">Copy</button>
+        <div class="key-display">{{ masked_key }}</div>
+        <div class="sub" style="margin-top: 0.5rem;">
+            Used for Bearer token authentication on all endpoints. The full key is never
+            served by this page (the dashboard is unauthenticated); read it on the server
+            from <code>backend/config/.env</code>.
         </div>
-        <div class="sub" style="margin-top: 0.5rem;">Used for Bearer token authentication on all endpoints.</div>
-        <script>
-            const maskedKey = "{{ masked_key }}";
-            const fullKey = "{{ full_key }}";
-            let revealed = false;
-            function toggleKey() {
-                revealed = !revealed;
-                document.getElementById('api-key-display').textContent = revealed ? fullKey : maskedKey;
-                document.getElementById('api-key-toggle').textContent = revealed ? 'Hide' : 'Show';
-            }
-            function copyKey() {
-                navigator.clipboard.writeText(fullKey).then(() => {
-                    const btn = event.target;
-                    btn.textContent = 'Copied';
-                    setTimeout(() => btn.textContent = 'Copy', 1500);
-                });
-            }
-        </script>
     </div>
     <div class="card">
         <h2>Database</h2>
