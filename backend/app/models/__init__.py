@@ -6,5 +6,7 @@ from app.models.health_metrics import DailyHealthMetrics
 from app.models.inventory import WorkoutInventory
 from app.models.plan import Plan
 from app.models.plan_note import PlanNote
+from app.models.user import User
+from app.models.api_token import ApiToken
 
-__all__ = ["Workout", "WorkoutQueue", "WorkoutAction", "WorkoutFeedback", "DailyHealthMetrics", "WorkoutInventory", "Plan", "PlanNote"]
+__all__ = ["Workout", "WorkoutQueue", "WorkoutAction", "WorkoutFeedback", "DailyHealthMetrics", "WorkoutInventory", "Plan", "PlanNote", "User", "ApiToken"]

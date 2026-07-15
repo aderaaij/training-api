@@ -64,7 +64,13 @@ api_tokens
 
 ---
 
-## Phase 1 — Users, tokens, login (backend still effectively single-user)
+## Phase 1 — ✅ DONE 2026-07-15: Users, tokens, login (backend still effectively single-user)
+
+**Shipped:** `users` + `api_tokens` tables (migrations `a1u2s3e4r5s6` schema, `b1t2o3k4e5n6` seed); `app/security.py` (argon2 passwords, `tapi_` tokens stored as SHA-256); `app/auth.py` swapped to `get_current_user` (token-hash lookup + expiry/active checks + throttled `last_used_at`); `app/routes/auth.py` (`POST /api/auth/login` rate-limited 5/min, `GET /api/auth/me`, `DELETE /api/auth/tokens/{id}`); `app/cli.py` (`bootstrap`/`create-user`/`set-password`/`create-token`/`list-users`); startup `cli bootstrap` in `scripts/start.sh`. Deps: `argon2-cffi`, `slowapi`. Verified end-to-end: legacy key still authenticates (seeded as admin's token — iOS app + MCP unaffected), admin login issues a working `tapi_` token, `/me` + revoke work, revoked/expired/garbage tokens 401, wrong password 401, rate limit trips at the 6th attempt, MCP still 35 tools. Admin password set once from `BOOTSTRAP_ADMIN_PASSWORD` in `backend/config/.env`.
+
+Original plan below.
+
+
 
 New files: `app/models/user.py`, `app/models/api_token.py`, `app/routes/auth.py`, `app/security.py` (hashing + token generation), `app/cli.py`.
 

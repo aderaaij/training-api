@@ -12,9 +12,16 @@ class Settings(BaseSettings):
     )
 
     database_url: str
+    # Legacy single-user key. Since the multi-user migration it is seeded as a
+    # token owned by the bootstrap admin (so existing clients keep working); new
+    # clients authenticate with per-user tokens from /api/auth/login.
     api_key: str
     environment: str = "LOCAL"
     db_host: str | None = None
+    # First-run admin bootstrap (see app/cli.py:bootstrap). Password is applied
+    # once, only if the admin has none yet; rotating the env var won't reset it.
+    bootstrap_admin_username: str = "admin"
+    bootstrap_admin_password: str | None = None
 
     @property
     def db_uri(self) -> str:

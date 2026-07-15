@@ -10,6 +10,8 @@ dependencies = [
     "pydantic-settings>=2.0",
     "alembic>=1.14",
     "uvicorn>=0.34",
+    "argon2-cffi>=23.1",
+    "slowapi>=0.1.9",
 ]
 
 [build-system]
