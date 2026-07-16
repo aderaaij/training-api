@@ -7,6 +7,7 @@ Personal workout tracking API with Apple Watch integration queue, training plans
 - **Backend:** FastAPI (Python 3.13) with Uvicorn
 - **Database:** PostgreSQL 16 with SQLAlchemy 2.0 ORM, Alembic migrations
 - **Package manager:** uv
+- **Frontend:** React 19 + TypeScript SPA ("Loopback", in `frontend/`) — Vite 8, React Compiler, TanStack Query, react-router, hand-rolled SVG charts, Leaflet route maps
 - **MCP Server:** FastMCP 2.0 (in `mcp/`)
 - **Infrastructure:** Docker Compose (`docker-compose.yml`)
 
@@ -15,17 +16,23 @@ Personal workout tracking API with Apple Watch integration queue, training plans
 ```
 backend/
   app/
-    main.py              # FastAPI app entry point
+    main.py              # FastAPI app entry point (+ serves the SPA build, see below)
     auth.py              # Bearer token auth
     config.py            # Pydantic-settings
     database.py          # SQLAlchemy setup
     models/              # ORM models
     routes/              # API route handlers
     schemas/             # Pydantic request/response schemas
-    templates/           # Jinja2 dashboard templates
-    static/              # Dashboard assets
+    templates/           # Jinja2 templates of the RETIRED server dashboard (not mounted)
+    static/              # Assets of the retired dashboard (not mounted)
   migrations/            # Alembic migrations
-  Dockerfile             # Multi-stage build with uv
+  Dockerfile             # Multi-stage build: Node (frontend) + uv (backend); context = repo root
+frontend/
+  src/
+    lib/                 # api client, wire types, auth context, query hooks, formatters
+    components/          # layout, shared UI, SVG chart primitives, route map
+    screens/             # one file per screen (Overview, Calendar, Workouts, Plans, Notes, Health, Queue, Settings, Users)
+    styles/              # global design tokens + per-screen CSS
 mcp/
   app/
     main.py              # FastMCP server entry point
@@ -33,6 +40,28 @@ mcp/
     tools/               # MCP tool routers (workouts, queue, actions, feedback, health, plans)
     services/            # HTTP client for backend API
 ```
+
+## Frontend (web dashboard)
+
+The authenticated React dashboard replaces the old unauthenticated server-rendered one.
+It is served **same-origin by FastAPI**: the Docker build bakes `frontend/dist` into the
+image at `/app/static` (`SPA_DIST` env var), `main.py` serves it at `/` with an SPA
+fallback for client-side routes. No CORS needed; the Tailscale Funnel setup is unchanged.
+
+```bash
+cd frontend
+npm run dev        # Vite dev server on :5173, proxies /api → localhost:8001
+npx tsc -b         # typecheck
+npm run build      # production build (also run inside the Docker build)
+```
+
+**Wire-casing warning:** the API's JSON casing is inconsistent per resource — auth,
+feedback and calendar are camelCase; workouts, queue, plans and health-metrics are
+snake_case; plan-notes are mixed. `frontend/src/lib/types.ts` mirrors this exactly on
+purpose. Don't "normalize" one side without the other.
+
+Login is rate-limited (5/min/IP). On any 401 the SPA wipes its token and returns to
+the login screen. The bearer token lives in localStorage (`loopback.*` keys).
 
 ## Development
 
