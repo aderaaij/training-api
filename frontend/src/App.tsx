@@ -1,0 +1,57 @@
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import type { ReactNode } from 'react'
+import { Layout } from './components/Layout'
+import { PageHeaderProvider } from './components/PageHeader'
+import { AuthProvider, useAuth } from './lib/auth'
+import { Calendar } from './screens/Calendar'
+import { Health } from './screens/Health'
+import { Login } from './screens/Login'
+import { Notes } from './screens/Notes'
+import { Overview } from './screens/Overview'
+import { PlanDetail } from './screens/PlanDetail'
+import { Plans } from './screens/Plans'
+import { Queue } from './screens/Queue'
+import { Settings } from './screens/Settings'
+import { Users } from './screens/Users'
+import { WorkoutDetail } from './screens/WorkoutDetail'
+import { Workouts } from './screens/Workouts'
+
+function RequireAuth({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
+  if (!user) return <Navigate to="/login" replace />
+  return children
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <PageHeaderProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route
+              element={
+                <RequireAuth>
+                  <Layout />
+                </RequireAuth>
+              }
+            >
+              <Route path="/" element={<Overview />} />
+              <Route path="/calendar" element={<Calendar />} />
+              <Route path="/workouts" element={<Workouts />} />
+              <Route path="/workouts/:id" element={<WorkoutDetail />} />
+              <Route path="/plans" element={<Plans />} />
+              <Route path="/plans/:id" element={<PlanDetail />} />
+              <Route path="/notes" element={<Notes />} />
+              <Route path="/health" element={<Health />} />
+              <Route path="/queue" element={<Queue />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/users" element={<Users />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </PageHeaderProvider>
+    </AuthProvider>
+  )
+}

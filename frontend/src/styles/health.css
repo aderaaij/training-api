@@ -1,0 +1,32 @@
+.health-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+.hm-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 11.5px;
+  font-family: var(--font-mono);
+  flex-wrap: wrap;
+}
+.hm-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.line-swatch {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  display: inline-block;
+}
+
+@media (max-width: 860px) {
+  .health-grid {
+    grid-template-columns: 1fr;
+  }
+  .health-grid > * {
+    grid-column: span 1 !important;
+  }
+}
