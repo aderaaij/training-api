@@ -1,12 +1,13 @@
 from datetime import datetime
 
 from fastapi import APIRouter, Query, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert
 
 from app.auth import CurrentUser
 from app.database import DbSession
 from app.models.feedback import WorkoutFeedback
+from app.models.queue import WorkoutQueue
 from app.schemas.feedback import FeedbackCreate, FeedbackRead
 
 router = APIRouter()
@@ -36,6 +37,22 @@ def submit_feedback(payload: FeedbackCreate, db: DbSession, user: CurrentUser):
         set_=update_fields,
     )
     db.execute(stmt)
+
+    # A skip is a decision about the queued workout itself: retire the queue
+    # item (workout_id IS the queue item id — the app-facing GET injects it)
+    # so the watch stops being offered a run that was skipped. One-way, and a
+    # completed item is never downgraded.
+    if payload.action == "skip" and not payload.dismissed:
+        db.execute(
+            update(WorkoutQueue)
+            .where(
+                WorkoutQueue.id == payload.workout_id,
+                WorkoutQueue.user_id == user.id,
+                WorkoutQueue.status.notin_(("completed", "skipped")),
+            )
+            .values(status="skipped")
+        )
+
     db.commit()
     return {"ok": True, "id": str(payload.id)}
 

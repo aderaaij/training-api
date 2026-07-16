@@ -35,6 +35,7 @@ def _runs_by_date(db: DbSession, user: User, dates: list) -> dict:
     rows = db.scalars(
         select(WorkoutQueue).where(
             WorkoutQueue.user_id == user.id,
+            WorkoutQueue.status != "skipped",  # a skipped run no longer occupies its day
             WorkoutQueue.scheduled_date.is_not(None),
             WorkoutQueue.scheduled_date >= lo,
             WorkoutQueue.scheduled_date <= hi,

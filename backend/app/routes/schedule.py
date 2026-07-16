@@ -96,12 +96,13 @@ def build_calendar(db: DbSession, user_id: uuid.UUID | None, date_from: date, da
                 "conflict": False,
             })
 
-    # --- Flag same-day run/strength collisions ---
+    # --- Flag same-day run/strength collisions (skipped runs don't collide) ---
     kinds_by_date: dict[str, set] = {}
     for e in entries:
-        kinds_by_date.setdefault(e["date"], set()).add(e["kind"])
+        if e["status"] != "skipped":
+            kinds_by_date.setdefault(e["date"], set()).add(e["kind"])
     for e in entries:
-        if {"run", "strength"} <= kinds_by_date[e["date"]]:
+        if e["status"] != "skipped" and {"run", "strength"} <= kinds_by_date.get(e["date"], set()):
             e["conflict"] = True
 
     entries.sort(key=lambda e: (e["date"], e["kind"]))
