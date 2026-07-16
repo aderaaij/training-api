@@ -16,7 +16,9 @@ services:
     restart: unless-stopped
 
   app:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     container_name: backend__training-api
     ports:
       - "${API_PORT:-8001}:8001"

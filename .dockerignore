@@ -1,0 +1,12 @@
+# Build context is the repo root (backend/Dockerfile)
+.git
+docs
+mcp
+frontend/node_modules
+frontend/dist
+backend/.venv
+backend/__pycache__
+**/__pycache__
+**/.pytest_cache
+**/*.pyc
+backend/config/.env

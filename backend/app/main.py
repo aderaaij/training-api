@@ -1,4 +1,8 @@
+import os
+from pathlib import Path
+
 from fastapi import APIRouter, Depends, FastAPI
+from fastapi.responses import FileResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -7,6 +11,12 @@ from app.rate_limit import limiter
 from app.routes import actions, auth, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
 
 app = FastAPI(title="Training API", version="0.1.0")
+
+# React dashboard build (frontend/dist), baked into the image at /app/static.
+# Served same-origin so the existing Tailscale Funnel setup needs no CORS.
+# Absent in local dev, where Vite serves the frontend and proxies /api here.
+SPA_DIST = Path(os.environ.get("SPA_DIST", "static")).resolve()
+SPA_INDEX = SPA_DIST / "index.html"
 
 # Rate limiting (used by /api/auth/login)
 app.state.limiter = limiter
@@ -22,6 +32,8 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 @app.get("/", include_in_schema=False)
 def root():
+    if SPA_INDEX.is_file():
+        return FileResponse(SPA_INDEX)
     return {"service": "training-api", "status": "ok"}
 
 
@@ -44,3 +56,16 @@ api_router.include_router(plans.router, prefix="/plans", tags=["plans"])
 api_router.include_router(plan_notes.router, prefix="/plan-notes", tags=["plan-notes"])
 api_router.include_router(schedule.router, prefix="/schedule", tags=["schedule"])
 app.include_router(api_router)
+
+
+# SPA catch-all — registered last, so it only sees paths no API route matched.
+# Real build files (assets/, favicon) are served as-is; anything else gets
+# index.html so client-side routes like /workouts/<id> deep-link correctly.
+@app.get("/{full_path:path}", include_in_schema=False)
+def spa(full_path: str):
+    if full_path.startswith("api/") or not SPA_INDEX.is_file():
+        return JSONResponse({"detail": "Not Found"}, status_code=404)
+    candidate = (SPA_DIST / full_path).resolve()
+    if candidate.is_file() and candidate.is_relative_to(SPA_DIST):
+        return FileResponse(candidate)
+    return FileResponse(SPA_INDEX)
