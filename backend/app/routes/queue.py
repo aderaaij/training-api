@@ -170,3 +170,17 @@ def app_mark_queue_item_synced(item_id: uuid.UUID, db: DbSession, user: CurrentU
     item.status = "synced"
     item.fetched_at = item.fetched_at or datetime.now(timezone.utc)
     db.commit()
+
+
+@workout_queue_router.patch("/{item_id}", status_code=status.HTTP_204_NO_CONTENT)
+def app_mark_queue_item_synced_patch(item_id: uuid.UUID, db: DbSession, user: CurrentUser):
+    """PATCH variant of the sync confirmation — newer app builds send this.
+
+    No body is parsed: whatever the app sends, a confirmed install means
+    `synced`. Statuses past `synced` (completed/skipped) are never downgraded.
+    """
+    item = get_owned(db, WorkoutQueue, item_id, user)
+    if item.status in ("pending", "fetched"):
+        item.status = "synced"
+        item.fetched_at = item.fetched_at or datetime.now(timezone.utc)
+        db.commit()
