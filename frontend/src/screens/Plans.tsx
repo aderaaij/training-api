@@ -2,6 +2,7 @@ import { FlagBanner } from '@phosphor-icons/react'
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
+import { FinishBanners } from '../components/PlanCelebration'
 import { EmptyState, ErrorNote, Loading, SectionLabel, StatusPill } from '../components/ui'
 import { activityMeta } from '../lib/activity'
 import { fmtDay, todayKey } from '../lib/format'
@@ -92,6 +93,7 @@ export function Plans() {
 
   return (
     <div className="screen">
+      <FinishBanners />
       {groups.map((g) => (
         <div className="plan-group" key={g.label}>
           <div className="group-head">

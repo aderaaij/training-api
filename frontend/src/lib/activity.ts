@@ -84,4 +84,5 @@ export const NOTE_KINDS: Record<string, { color: string; label: string }> = {
   life_context: { color: '#48C7C7', label: 'Context' },
   observation: { color: '#5FB98A', label: 'Observation' },
   blocker: { color: '#DC4A3B', label: 'Blocker' },
+  feedback: { color: '#D9A93E', label: 'Feedback' },
 }

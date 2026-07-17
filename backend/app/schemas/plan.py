@@ -19,6 +19,16 @@ class PlanCreate(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class PlanProgress(BaseModel):
+    """Queue-derived run counts. Strength sessions never queue, so a
+    schedule-only plan legitimately reports all zeros."""
+
+    runs_total: int = 0
+    runs_completed: int = 0
+    runs_skipped: int = 0
+    runs_remaining: int = 0
+
+
 class PlanRead(BaseModel):
     model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
@@ -32,6 +42,23 @@ class PlanRead(BaseModel):
     metadata: dict[str, Any] = Field(validation_alias="metadata_")
     created_at: datetime
     updated_at: datetime
+    # Computed on read (list/get/complete); create/update responses leave the
+    # defaults. `finishable` = active plan that looks done — the dashboard
+    # offers the celebrate-and-complete flow; nothing flips status by itself.
+    progress: PlanProgress | None = None
+    finishable: bool = False
+
+
+class PlanCompleteRequest(BaseModel):
+    feedback: str | None = None
+    rating: int | None = Field(default=None, ge=1, le=5)
+
+
+class PlanCompleteResponse(BaseModel):
+    plan: PlanRead
+    # Another already-active plan of the same activity, if one exists — the UI
+    # uses its absence to nudge "set up the next block with your coach".
+    next_plan: PlanRead | None = None
 
 
 class PlanUpdate(BaseModel):

@@ -12,6 +12,7 @@ import {
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
+import { FinishBanners } from '../components/PlanCelebration'
 import { ConflictPill, IconTile, SectionLabel, StatusPill } from '../components/ui'
 import { activityMeta, effortColor } from '../lib/activity'
 import { useAuth } from '../lib/auth'
@@ -370,6 +371,7 @@ export function Overview() {
 
   return (
     <div className="screen">
+      <FinishBanners />
       <HealthTiles />
       <div className="two-col">
         <div className="col-stack">
