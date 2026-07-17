@@ -1,6 +1,7 @@
 """Training MCP Server - Main entry point."""
 
 import logging
+import os
 from datetime import date
 
 from fastmcp import FastMCP
@@ -163,8 +164,21 @@ logger.info(f"Training MCP server initialized. API URL: {settings.training_api_u
 
 
 def main() -> None:
-    """Entry point for the MCP server."""
-    mcp.run()
+    """Entry point for the MCP server.
+
+    Default transport is stdio (direct clients, or wrapped by supergateway).
+    Set MCP_TRANSPORT=http (with MCP_HOST / MCP_PORT) to serve streamable HTTP
+    natively — no supergateway needed; point clients at http://<host>:<port>/mcp
+    """
+    transport = os.environ.get("MCP_TRANSPORT", "stdio").lower()
+    if transport in ("http", "streamable-http"):
+        mcp.run(
+            transport="http",
+            host=os.environ.get("MCP_HOST", "0.0.0.0"),
+            port=int(os.environ.get("MCP_PORT", "8590")),
+        )
+    else:
+        mcp.run()
 
 
 if __name__ == "__main__":
