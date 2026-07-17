@@ -111,7 +111,7 @@ When adding/changing models, create a migration with `make create_migration m="d
 
 The MCP server (`mcp/`) exposes training data to Claude via FastMCP. It talks to the backend API over HTTP.
 
-- Runs as a separate systemd service (`training-mcp`) on port **8590** via supergateway
+- Runs as a separate systemd service (`training-mcp`) on port **8590** — native FastMCP streamable HTTP at `/mcp` since 2026-07-17 (`MCP_TRANSPORT=http` in the unit, no supergateway; stdio remains the default transport for direct clients). Rollback: `training-mcp.service.pre-native.bak`
 - Config: `~/.config/systemd/user/training-mcp.service`
 - Env: `mcp/config/.env` (needs `TRAINING_API_URL` and `TRAINING_API_KEY`)
 
