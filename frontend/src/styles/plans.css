@@ -247,6 +247,161 @@
   white-space: pre-wrap;
 }
 
+/* ═══ plan completion ═══ */
+
+.finish-banner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  border-radius: 20px;
+  padding: 18px 20px;
+  margin-bottom: 18px;
+  background: linear-gradient(160deg, color-mix(in srgb, var(--gold) 13%, var(--card)), var(--card) 70%);
+  border: 1px solid color-mix(in srgb, var(--gold) 38%, transparent);
+}
+.finish-banner .fb-trophy {
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: color-mix(in srgb, var(--gold) 20%, transparent);
+  color: var(--gold);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--gold) 22%, transparent);
+}
+.finish-banner .fb-title {
+  font-family: var(--font-display);
+  font-size: 15.5px;
+  font-weight: 600;
+}
+.finish-banner .fb-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+@media (max-width: 660px) {
+  .finish-banner {
+    flex-wrap: wrap;
+  }
+  .finish-banner .btn-accent {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+.celebrate {
+  position: relative;
+  text-align: center;
+}
+.celebrate .cel-trophy {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: 20px;
+  margin: 4px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--gold) 18%, transparent);
+  color: var(--gold);
+  box-shadow: 0 0 44px color-mix(in srgb, var(--gold) 28%, transparent);
+}
+.celebrate .cel-title {
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.4px;
+  margin-top: 16px;
+}
+.celebrate .cel-plan {
+  font-size: 14px;
+  color: var(--text-2);
+  margin: 6px 0 4px;
+}
+.celebrate .cel-stats {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: 30px;
+  margin-top: 18px;
+}
+.celebrate .cel-stat .v {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+}
+.celebrate .cel-stat .k {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.celebrate .rating-row {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 8px;
+}
+.celebrate .rating-row button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 3px;
+  color: var(--faint);
+  transition: color 0.12s ease, transform 0.12s ease;
+}
+.celebrate .rating-row button:hover {
+  transform: scale(1.12);
+}
+.celebrate .rating-row button.on {
+  color: var(--gold);
+}
+.celebrate .cel-next {
+  position: relative;
+  display: flex;
+  gap: 11px;
+  margin-top: 20px;
+  padding: 14px 15px;
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.confetti {
+  position: absolute;
+  inset: -28px -28px auto;
+  height: 380px;
+  pointer-events: none;
+  overflow: hidden;
+}
+.confetti span {
+  position: absolute;
+  top: -16px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confetti-fall linear infinite;
+}
+@keyframes confetti-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) rotate(var(--tilt, 0deg));
+  }
+  6% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(400px) rotate(calc(var(--tilt, 0deg) + 520deg));
+  }
+}
+
 .unknown-key {
   margin-top: 16px;
   padding-top: 16px;

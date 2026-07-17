@@ -95,6 +95,10 @@ Models live in `backend/app/models/`. Key tables:
 - **WorkoutFeedback** - missed workout feedback
 - **WorkoutInventory** - current on-device workout snapshot
 
+### Plan completion
+- Plan reads (list/get) carry computed `progress` (queue-derived run counts) and `finishable` — an active, started plan whose window has passed or whose queued runs are all retired (≥1 actually completed). Nothing flips status automatically: the dashboard shows a celebration banner/modal (Overview, Plans, PlanDetail) for finishable plans and the user confirms.
+- `POST /api/plans/{id}/complete` (400 if not active) — sets status `completed`, stamps `metadata.completion` `{completed_on, rating?, feedback?}`, stores feedback/rating as a **kind:"feedback" PlanNote** (the coach LLM sees it via `get_plan_context`), and returns `next_plan` — another already-active same-activity plan, or null, which the UI turns into a "chat with your coach to shape the next block" nudge.
+
 ### Scheduling / calendar
 - `GET/PUT/DELETE /api/plans/{id}/schedule` — read/set/clear a plan's recurring cadence; the response resolves it to concrete dated `sessions` and flags any that **collide with a queued run** (`warnings`, surfaced not blocked). Weekday keys validated against `mon..sun`.
 - `GET /api/schedule/calendar?from=&to=` — unified timeline merging scheduled runs (queue) + strength sessions (active plan schedules), each with a `conflict` flag. Shared by the dashboard **Schedule** page and the MCP.

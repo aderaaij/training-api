@@ -109,6 +109,8 @@ async def append_plan_note(
           - "life_context" — temporary life situation affecting training
           - "observation"  — non-obvious insight worth remembering
           - "blocker"      — something preventing planned training
+          - "feedback"     — the athlete's own review of a plan or block
+            (the dashboard's plan wrap-up flow writes these too)
         summary: One-line summary, ≤280 chars. Lead with the fact, not
             "the user said". Example: "Prefers morning runs, never evenings."
         body: Optional longer body — the *why*, edge cases, exceptions.
@@ -165,7 +167,7 @@ async def list_plan_notes(
     Args:
         plan_id: Filter by plan UUID.
         kind: Filter by kind (decision, preference, constraint,
-            life_context, observation, blocker).
+            life_context, observation, blocker, feedback).
         conversation_id: Filter by conversation grouping id.
         since_days: Only notes created within this window.
         include_expired: If true, include notes past their expires_at.

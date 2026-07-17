@@ -31,7 +31,7 @@ PlanStatus = Literal["active", "completed", "abandoned"]
 
 # Enforced by the backend (regex / Literal / Query pattern) — mirrored here so
 # the values are visible in the tool schema instead of costing a 422 round trip.
-NoteKind = Literal["decision", "preference", "constraint", "life_context", "observation", "blocker"]
+NoteKind = Literal["decision", "preference", "constraint", "life_context", "observation", "blocker", "feedback"]
 FeedbackAction = Literal["move", "adjust", "skip"]
 SummaryPeriod = Literal["week", "month", "year"]
 

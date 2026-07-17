@@ -2,6 +2,7 @@ import { Check, Warning } from '@phosphor-icons/react'
 import { useMemo } from 'react'
 import { useParams } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
+import { FinishBanner } from '../components/PlanCelebration'
 import { ConflictPill, ErrorNote, Loading, SectionLabel, StatusPill } from '../components/ui'
 import { activityMeta } from '../lib/activity'
 import { fmtDay, fmtDayYear, fmtDowDayTime, todayKey } from '../lib/format'
@@ -101,6 +102,7 @@ export function PlanDetail() {
 
   return (
     <div className="screen">
+      <FinishBanner plan={plan} />
       {plan.description && (
         <div className="prose-card" style={{ marginBottom: 18 }}>
           <div className="prose">{plan.description}</div>

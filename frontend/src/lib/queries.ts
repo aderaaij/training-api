@@ -10,6 +10,7 @@ import type {
   MeResponse,
   MintedToken,
   Plan,
+  PlanCompleteResponse,
   PlanNote,
   PlanNoteContext,
   PlanScheduleResponse,
@@ -199,6 +200,24 @@ export function usePlanSchedule(id: string | undefined) {
     queryKey: ['plan', id, 'schedule'],
     queryFn: () => api.get<PlanScheduleResponse>(`/api/plans/${id}/schedule`),
     enabled: !!id,
+  })
+}
+
+export function useCompletePlan() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, feedback, rating }: { id: string; feedback?: string; rating?: number }) =>
+      api.post<PlanCompleteResponse>(`/api/plans/${id}/complete`, {
+        feedback: feedback || null,
+        rating: rating ?? null,
+      }),
+    onSuccess: (_, { id }) => {
+      qc.invalidateQueries({ queryKey: ['plans'] })
+      qc.invalidateQueries({ queryKey: ['plan', id] })
+      qc.invalidateQueries({ queryKey: ['plan-notes'] })
+      qc.invalidateQueries({ queryKey: ['plan-notes-context'] })
+      qc.invalidateQueries({ queryKey: ['calendar'] })
+    },
   })
 }
 

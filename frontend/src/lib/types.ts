@@ -224,17 +224,34 @@ export interface PlanMetadata {
   [key: string]: unknown
 }
 
+/** Queue-derived run counts; a schedule-only strength plan is all zeros. */
+export interface PlanProgress {
+  runs_total: number
+  runs_completed: number
+  runs_skipped: number
+  runs_remaining: number
+}
+
 export interface Plan {
   id: string
   name: string
   activity_type: string
-  status: string // active | archived | ... (free string)
+  status: string // active | completed | archived | ... (free string)
   start_date: string
   end_date: string | null
   description: string | null
   metadata: PlanMetadata
   created_at: string
   updated_at: string
+  progress: PlanProgress | null
+  /** Active plan that looks done — offer the celebrate-and-complete flow. */
+  finishable: boolean
+}
+
+export interface PlanCompleteResponse {
+  plan: Plan
+  /** Another already-active same-activity plan; null → nudge "ask your coach". */
+  next_plan: Plan | null
 }
 
 // plan schedule (camelCase)
@@ -276,6 +293,7 @@ export type NoteKind =
   | 'life_context'
   | 'observation'
   | 'blocker'
+  | 'feedback'
 
 export interface PlanNote {
   id: string

@@ -1,17 +1,21 @@
 import uuid
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timezone
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 
 from app.auth import CurrentUser
 from app.database import DbSession
 from app.models.plan import Plan
+from app.models.plan_note import PlanNote
 from app.models.queue import WorkoutQueue
 from app.models.user import User
 from app.schedule_utils import resolve_sessions
 from app.schemas.plan import (
+    PlanCompleteRequest,
+    PlanCompleteResponse,
     PlanCreate,
+    PlanProgress,
     PlanRead,
     PlanSchedule,
     PlanScheduleResponse,
@@ -22,6 +26,50 @@ from app.schemas.queue import QueueItemRead
 from app.tenancy import get_owned
 
 router = APIRouter()
+
+
+def _progress_by_plan(db: DbSession, user: User, plan_ids: list[uuid.UUID]) -> dict[uuid.UUID, PlanProgress]:
+    """Run counts per plan from the queue, one grouped query for the batch."""
+    if not plan_ids:
+        return {}
+    rows = db.execute(
+        select(WorkoutQueue.plan_id, WorkoutQueue.status, func.count())
+        .where(WorkoutQueue.user_id == user.id, WorkoutQueue.plan_id.in_(plan_ids))
+        .group_by(WorkoutQueue.plan_id, WorkoutQueue.status)
+    ).all()
+    out: dict[uuid.UUID, PlanProgress] = {}
+    for plan_id, run_status, count in rows:
+        p = out.setdefault(plan_id, PlanProgress())
+        p.runs_total += count
+        if run_status == "completed":
+            p.runs_completed += count
+        elif run_status == "skipped":
+            p.runs_skipped += count
+        else:
+            p.runs_remaining += count
+    return out
+
+
+def _is_finishable(plan: Plan, progress: PlanProgress, today: date) -> bool:
+    """An active plan that looks done: its window has passed, or every queued
+    run is retired (with at least one actually completed — a fully-skipped
+    plan the day it's created shouldn't celebrate)."""
+    if plan.status != "active" or plan.start_date > today:
+        return False
+    window_over = plan.end_date is not None and plan.end_date < today
+    all_runs_done = (
+        progress.runs_total > 0
+        and progress.runs_remaining == 0
+        and progress.runs_completed > 0
+    )
+    return window_over or all_runs_done
+
+
+def _plan_read(plan: Plan, progress: PlanProgress, today: date) -> PlanRead:
+    out = PlanRead.model_validate(plan)
+    out.progress = progress
+    out.finishable = _is_finishable(plan, progress, today)
+    return out
 
 
 def _runs_by_date(db: DbSession, user: User, dates: list) -> dict:
@@ -110,12 +158,17 @@ def list_plans(
     if activity_type:
         q = q.where(Plan.activity_type == activity_type)
 
-    return db.scalars(q).all()
+    plans = db.scalars(q).all()
+    progress = _progress_by_plan(db, user, [p.id for p in plans])
+    today = datetime.now(timezone.utc).date()
+    return [_plan_read(p, progress.get(p.id, PlanProgress()), today) for p in plans]
 
 
 @router.get("/{plan_id}", response_model=PlanRead)
 def get_plan(plan_id: uuid.UUID, db: DbSession, user: CurrentUser):
-    return get_owned(db, Plan, plan_id, user)
+    plan = get_owned(db, Plan, plan_id, user)
+    progress = _progress_by_plan(db, user, [plan.id])
+    return _plan_read(plan, progress.get(plan.id, PlanProgress()), datetime.now(timezone.utc).date())
 
 
 @router.patch("/{plan_id}", response_model=PlanRead)
@@ -140,6 +193,67 @@ def update_plan(plan_id: uuid.UUID, payload: PlanUpdate, db: DbSession, user: Cu
     db.commit()
     db.refresh(plan)
     return plan
+
+
+@router.post("/{plan_id}/complete", response_model=PlanCompleteResponse)
+def complete_plan(plan_id: uuid.UUID, payload: PlanCompleteRequest, db: DbSession, user: CurrentUser):
+    """Wrap up an active plan: set status to completed, stamp
+    metadata.completion, and store the athlete's feedback as a
+    kind="feedback" plan note so the coach LLM sees it in get_plan_context.
+    The response includes ``next_plan`` — another already-active plan of the
+    same activity — so the UI knows whether to suggest planning the next block.
+    """
+    plan = get_owned(db, Plan, plan_id, user)
+    if plan.status != "active":
+        raise HTTPException(status_code=400, detail="Only an active plan can be completed")
+
+    today = datetime.now(timezone.utc).date()
+    completion: dict = {"completed_on": today.isoformat()}
+    if payload.rating is not None:
+        completion["rating"] = payload.rating
+    if payload.feedback:
+        completion["feedback"] = payload.feedback
+    metadata = dict(plan.metadata_ or {})
+    metadata["completion"] = completion
+    plan.metadata_ = metadata
+    plan.status = "completed"
+
+    if payload.feedback or payload.rating is not None:
+        summary = f"Plan wrap-up: {plan.name}"
+        if payload.rating is not None:
+            summary += f" — rated {payload.rating}/5"
+        db.add(
+            PlanNote(
+                user_id=user.id,
+                plan_id=plan.id,
+                kind="feedback",
+                summary=summary[:280],
+                body=payload.feedback,
+                importance=2,
+            )
+        )
+
+    next_plan = db.scalars(
+        select(Plan)
+        .where(
+            Plan.user_id == user.id,
+            Plan.id != plan.id,
+            Plan.status == "active",
+            Plan.activity_type == plan.activity_type,
+            or_(Plan.end_date.is_(None), Plan.end_date >= today),
+        )
+        .order_by(Plan.start_date)
+    ).first()
+
+    db.commit()
+    db.refresh(plan)
+
+    ids = [plan.id] + ([next_plan.id] if next_plan else [])
+    progress = _progress_by_plan(db, user, ids)
+    return PlanCompleteResponse(
+        plan=_plan_read(plan, progress.get(plan.id, PlanProgress()), today),
+        next_plan=_plan_read(next_plan, progress.get(next_plan.id, PlanProgress()), today) if next_plan else None,
+    )
 
 
 @router.delete("/{plan_id}", status_code=status.HTTP_204_NO_CONTENT)
