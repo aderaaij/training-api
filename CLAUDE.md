@@ -2,6 +2,8 @@
 
 Personal workout tracking API with Apple Watch integration queue, training plans, health metrics, and a web dashboard.
 
+The companion iOS app lives at [aderaaij/loopback-training-app](https://github.com/aderaaij/loopback-training-app); a working copy is usually checked out as a sibling directory (`../loopback-training-app`). Cross-reference it for the client side of the API contract (`WorkoutAPIClient.swift`, `SessionStore.swift`, `WorkoutScheduleManager.swift`) before changing wire formats — and `git pull` it first, since development happens elsewhere.
+
 ## Tech Stack
 
 - **Backend:** FastAPI (Python 3.13) with Uvicorn
