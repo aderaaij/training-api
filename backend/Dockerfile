@@ -1,7 +1,10 @@
 # Build context is the REPO ROOT (see docker-compose.yml) so this image can
 # bake in the React dashboard from ../frontend alongside the backend.
 
-FROM node:22-slim AS frontend
+# --platform=$BUILDPLATFORM: the frontend output is static files, so this stage
+# always runs on the build host's native arch (no QEMU emulation of npm when
+# cross-building the multi-arch image in CI).
+FROM --platform=$BUILDPLATFORM node:22-slim AS frontend
 WORKDIR /fe
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci

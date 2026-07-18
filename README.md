@@ -27,7 +27,7 @@ Built with FastAPI, PostgreSQL, SQLAlchemy, and React. Includes an optional MCP 
 
 ### Prerequisites
 
-- Docker with Docker Compose
+- Docker with Docker Compose v2.24 or newer
 
 ### 1. Clone and configure
 
@@ -45,7 +45,7 @@ Edit `.env` and set `BOOTSTRAP_ADMIN_PASSWORD` — the password for the first-ru
 docker compose up -d      # or: make up
 ```
 
-The first start builds the image (React dashboard + Python backend, takes a few minutes), runs the database migrations, and creates the `admin` account. The API and dashboard are then at `http://localhost:8001` (verify with `curl http://localhost:8001/api/health`).
+The first start pulls a prebuilt multi-arch image from GHCR (amd64/arm64; if the pull fails it builds from source instead, which takes a few minutes — `docker compose build` forces that), runs the database migrations, and creates the `admin` account. The API and dashboard are then at `http://localhost:8001` (verify with `curl http://localhost:8001/api/health`).
 
 ### 3. Log in
 
