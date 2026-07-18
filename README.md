@@ -1,5 +1,8 @@
 # Loopback Server
 
+[![CI](https://github.com/aderaaij/loopback-training-server/actions/workflows/ci.yml/badge.svg)](https://github.com/aderaaij/loopback-training-server/actions/workflows/ci.yml)
+[![Docker image](https://github.com/aderaaij/loopback-training-server/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/aderaaij/loopback-training-server/actions/workflows/docker-publish.yml)
+
 The self-hosted backend behind **Loopback – Run Coach**, an iOS running app. It stores workout history, queues structured workouts for delivery to Apple Watch via WorkoutKit, manages training plans and daily health metrics, and serves an authenticated web dashboard for athletes and admins.
 
 Built with FastAPI, PostgreSQL, SQLAlchemy, and React. Includes an optional MCP (Model Context Protocol) server so an AI assistant can act as your running coach over the same data.
@@ -24,6 +27,7 @@ Built with FastAPI, PostgreSQL, SQLAlchemy, and React. Includes an optional MCP 
 - **Missed workout feedback** — Record and query feedback when users miss scheduled workouts, with pattern detection for coaching
 - **Training plans** — Create and manage training plans with goals, guardrails, phases, and athlete context stored as flexible JSONB metadata, plus an explicit completion flow (rating + feedback fed back to the coaching context)
 - **Scheduling & calendar** — Attach a recurring weekly cadence to a plan and query a unified calendar that merges queued runs with scheduled strength sessions, flagging conflicts
+- **Plan validation** — A deterministic "linter" for upcoming schedules: weekly-ramp and taper checks, missing down weeks, back-to-back hard days, guardrail breaches, strength-day collisions — warnings, never blocks (`POST /api/plans/{id}/validate`, also returned when queueing)
 - **Health metrics** — Bulk upsert daily HealthKit metrics (sleep, HR, HRV, weight, VO2Max, steps, body composition) with date-based upsert
 - **Plan-workout linking** — Link queued workouts to plans (`plan_id`) and recorded workouts to their planned counterpart (`plan_workout_id`) for planned-vs-actual analysis
 - **Multi-user** — Username/password accounts with per-device API tokens (`POST /api/auth/login`); all data is scoped per user
@@ -171,12 +175,15 @@ All endpoints except `/api/health` and `/api/auth/login` require a `Bearer` toke
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/queue` | Queue a structured workout |
+| `POST` | `/api/queue` | Queue a structured workout (response carries an additive `validation` key with schedule warnings) |
+| `POST` | `/api/queue/batch` | Queue several workouts at once → `{items, validation}` envelope |
 | `GET` | `/api/queue` | List queue items (filter by `status`) |
 | `GET` | `/api/queue/pending` | List pending items |
+| `PATCH` | `/api/queue/{id}` | Edit a queue item's fields |
 | `PATCH` | `/api/queue/{id}/status` | Update item status (`pending` / `fetched` / `synced` / `completed` / `skipped`) |
 | `DELETE` | `/api/queue/{id}` | Delete a queue item |
 | `GET` | `/api/workouts/queue` | App-facing: get pending workouts as WorkoutKit compositions |
+| `PATCH` | `/api/workouts/queue/{id}` | App-facing: confirm install → `synced` (never downgrades completed/skipped) |
 | `DELETE` | `/api/workouts/queue/{id}` | App-facing: mark item as synced (persists the record) |
 
 ### Workout Actions
@@ -211,6 +218,7 @@ All endpoints except `/api/health` and `/api/auth/login` require a `Bearer` toke
 | `GET` | `/api/plans/{id}` | Get plan with metadata |
 | `PATCH` | `/api/plans/{id}` | Update plan fields |
 | `POST` | `/api/plans/{id}/complete` | Complete an active plan (rating/feedback stored as a coaching note) |
+| `POST` | `/api/plans/{id}/validate` | Deterministic schedule check → `{plan_id, warnings, weeks}` (ramp, taper, collisions, guardrails) |
 | `DELETE` | `/api/plans/{id}` | Delete a plan (queue items keep `plan_id` set to null) |
 | `GET` | `/api/plans/{id}/workouts` | Get all queued workouts for a plan |
 | `GET` | `/api/plans/{id}/schedule` | Read the plan's recurring weekly cadence, resolved to dated sessions |
@@ -290,6 +298,7 @@ docker compose exec app python -m pytest
 ```
 ├── docker-compose.yml          # PostgreSQL + API orchestration
 ├── .env.example                # Compose configuration template (copy to .env)
+├── .github/                    # CI + GHCR image workflows, README screenshots
 ├── Makefile                    # Dev shortcuts
 ├── backend/
 │   ├── Dockerfile              # Multi-stage build: Node (frontend) + Python 3.13 (uv); context = repo root
