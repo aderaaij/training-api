@@ -159,9 +159,11 @@
 }
 
 @media (max-width: 700px) {
+  /* Member · Tokens · Status · Actions — the tokens toggle stays reachable on
+     phones (it's the only way into per-device revoke). */
   .users-table .u-head,
   .users-table .u-row {
-    grid-template-columns: 2fr 0.8fr 1.2fr;
+    grid-template-columns: 2fr 0.55fr 0.85fr 1.2fr;
   }
   .users-table .hide-sm {
     display: none;

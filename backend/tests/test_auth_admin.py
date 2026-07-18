@@ -225,6 +225,18 @@ def test_events_feed_rejects_non_admin(client_a):
     assert client_a.get("/api/admin/events").status_code == 403
 
 
+def test_rate_limited_login_audits_once_per_window(client_admin, user_a):
+    # 5/min/IP on login; past that every request 429s but the audit trail gets
+    # at most one row per IP per window — hammering can't flood the table.
+    codes = [_login("alice", "wrong").status_code for _ in range(8)]
+    assert codes.count(429) >= 2
+
+    events = client_admin.get("/api/admin/events").json()
+    limited = [e for e in events if e["event"] == "login_rate_limited"]
+    assert len(limited) == 1
+    assert limited[0]["ip"] is not None
+
+
 # --- system status -----------------------------------------------------------
 
 def test_system_status_shape(client_admin, user_a):

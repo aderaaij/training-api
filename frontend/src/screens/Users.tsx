@@ -252,7 +252,7 @@ export function Users() {
           <div className="u-head">
             <span>Member</span>
             <span className="hide-sm">Role</span>
-            <span className="hide-sm">Tokens</span>
+            <span>Tokens</span>
             <span className="hide-sm">Last seen</span>
             <span>Status</span>
             <span style={{ textAlign: 'right' }}>Actions</span>
@@ -288,7 +288,7 @@ export function Users() {
                   {u.role === 'admin' ? 'Admin' : 'Member'}
                 </span>
                 <button
-                  className="mono-meta hide-sm u-tokens-toggle"
+                  className="mono-meta u-tokens-toggle"
                   style={{ fontSize: 12.5 }}
                   title="Show this member's tokens"
                   onClick={() => setExpandedId(expanded ? null : u.id)}

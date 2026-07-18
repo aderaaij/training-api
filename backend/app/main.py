@@ -1,4 +1,6 @@
+import logging
 import os
+import time
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -24,11 +26,29 @@ SPA_INDEX = SPA_DIST / "index.html"
 app.state.limiter = limiter
 
 
+# The login endpoint is publicly reachable (Tailscale Funnel), so a hammered
+# rate limit must not translate every 429 into a DB write: audit at most one
+# event per IP per window, tracked in-process.
+_RL_EVENT_WINDOW_S = 60.0
+_rl_event_last: dict[str, float] = {}
+
+
 def _rate_limited(request: Request, exc: Exception):
-    # The route's own DB session is unusable here (the request never entered
-    # the route), so the audit row gets its own short-lived session.
-    with SessionLocal() as db:
-        record_auth_event(db, "login_rate_limited", ip=client_ip(request), commit=True)
+    ip = client_ip(request)
+    now = time.monotonic()
+    last = _rl_event_last.get(ip or "")
+    if last is None or now - last >= _RL_EVENT_WINDOW_S:
+        if len(_rl_event_last) > 1024:  # bound the map under a many-IP flood
+            _rl_event_last.clear()
+        _rl_event_last[ip or ""] = now
+        try:
+            # The route's own DB session is unusable here (the request never
+            # entered the route), so the audit row gets its own session.
+            with SessionLocal() as db:
+                record_auth_event(db, "login_rate_limited", ip=ip, commit=True)
+        except Exception:
+            # Auditing must never turn a 429 into a 500.
+            logging.getLogger("uvicorn.error").exception("failed to record login_rate_limited")
     return _rate_limit_exceeded_handler(request, exc)  # type: ignore[arg-type]
 
 
