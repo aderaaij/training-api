@@ -65,20 +65,6 @@
   border-radius: 8px;
 }
 
-.sidebar-admin {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.sidebar-admin .admin-label {
-  font-family: var(--font-mono);
-  font-size: 9.5px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--faint);
-  padding: 0 13px 8px;
-}
-
 .sidebar-foot {
   margin-top: auto;
   display: flex;

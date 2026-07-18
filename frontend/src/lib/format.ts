@@ -100,6 +100,19 @@ export function relTime(iso: string | null | undefined): string {
   return fmtDay(iso)
 }
 
+export function fmtBytes(n: number | null | undefined): string {
+  if (n == null) return '—'
+  if (n < 1024) return `${n} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let v = n
+  let i = -1
+  do {
+    v /= 1024
+    i++
+  } while (v >= 1024 && i < units.length - 1)
+  return `${v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`
+}
+
 /** Local YYYY-MM-DD (calendar math must not go through UTC). */
 export function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`

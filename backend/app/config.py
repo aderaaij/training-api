@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     api_key: str
     environment: str = "LOCAL"
     db_host: str | None = None
+    # Read-only mount of the NAS backup dir (docker-compose); the admin System
+    # screen reports the newest dump found here. Absent dir = "no backups".
+    backup_dir: str = "/backups"
     # First-run admin bootstrap (see app/cli.py:bootstrap). Password is applied
     # once, only if the admin has none yet; rotating the env var won't reset it.
     bootstrap_admin_username: str = "admin"

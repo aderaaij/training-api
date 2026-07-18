@@ -55,6 +55,31 @@ export interface AdminUserRow {
   isActive: boolean
   tokenCount: number
   lastSeenAt: string | null
+  // Sync freshness (metadata only): when the last workout row arrived, and the
+  // most recent day that has health metrics. Null for admins — they have no data.
+  lastWorkoutSyncAt: string | null
+  lastHealthDate: string | null
+}
+
+/** GET /api/admin/users/{id}/tokens — same shape as the self-service ApiTokenInfo. */
+export type AdminTokenRow = ApiTokenInfo
+
+export interface AuthEventRow {
+  id: string
+  event: string
+  username: string | null
+  actorUsername: string | null
+  ip: string | null
+  detail: Record<string, unknown> | null
+  createdAt: string
+}
+
+export interface SystemStatus {
+  backup: { file: string; sizeBytes: number; completedAt: string } | null
+  backupCount: number
+  dbSizeBytes: number
+  migrationHead: string | null
+  counts: Record<string, number>
 }
 
 // ── workouts (snake_case) ──

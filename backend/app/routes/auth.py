@@ -15,6 +15,7 @@ from pydantic.alias_generators import to_camel
 from sqlalchemy import delete, select
 
 from app.auth import CurrentUser, security
+from app.auth_events import client_ip, record_auth_event
 from app.database import DbSession
 from app.models.api_token import ApiToken
 from app.models.user import User
@@ -101,11 +102,16 @@ def login(request: Request, body: LoginRequest, db: DbSession) -> LoginResponse:
         or user.password_hash is None
         or not verify_password(user.password_hash, body.password)
     ):
+        record_auth_event(db, "login_failed", username=username, ip=client_ip(request), commit=True)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
 
     raw = generate_token()
     token = ApiToken(user_id=user.id, token_hash=hash_token(raw), name=(body.device_name or "").strip()[:100])
     db.add(token)
+    record_auth_event(
+        db, "login_success", username=username, user_id=user.id, ip=client_ip(request),
+        detail={"device": token.name} if token.name else None,
+    )
     db.commit()
     db.refresh(token)
     return LoginResponse(token=raw, token_id=token.id, user=UserOut.model_validate(user))
@@ -136,6 +142,10 @@ def change_password(
             ApiToken.user_id == user.id, ApiToken.token_hash != hash_token(credentials.credentials)
         )
     )
+    record_auth_event(
+        db, "password_changed", username=user.username, user_id=user.id, actor_user_id=user.id,
+        detail={"revoked_tokens": result.rowcount},
+    )
     db.commit()
     return ChangePasswordResponse(revoked_tokens=result.rowcount)
 
@@ -145,6 +155,10 @@ def mint_token(body: MintTokenRequest, user: CurrentUser, db: DbSession) -> Mint
     raw = generate_token()
     token = ApiToken(user_id=user.id, token_hash=hash_token(raw), name=body.name, expires_at=body.expires_at)
     db.add(token)
+    record_auth_event(
+        db, "token_created", username=user.username, user_id=user.id, actor_user_id=user.id,
+        detail={"name": body.name},
+    )
     db.commit()
     db.refresh(token)
     return MintTokenResponse(token=raw, token_id=token.id)
@@ -156,5 +170,9 @@ def revoke_token(token_id: uuid.UUID, user: CurrentUser, db: DbSession) -> None:
     if token is None or token.user_id != user.id:
         # 404 (not 403) so one user can't probe another's token ids.
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    record_auth_event(
+        db, "token_revoked", username=user.username, user_id=user.id, actor_user_id=user.id,
+        detail={"name": token.name},
+    )
     db.delete(token)
     db.commit()

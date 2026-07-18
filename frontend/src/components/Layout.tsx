@@ -6,6 +6,7 @@ import {
   CaretLeft,
   FlagBanner,
   Heartbeat,
+  HardDrives,
   List,
   PersonSimpleRun,
   SignOut,
@@ -50,13 +51,21 @@ const NAV: { to: string; label: string; icon: Icon }[] = [
   { to: '/queue', label: 'Queue', icon: Watch },
 ]
 
+// Admins manage accounts, they aren't athletes — no workout data behind the athlete screens.
+const ADMIN_NAV: { to: string; label: string; icon: Icon }[] = [
+  { to: '/users', label: 'Users', icon: UsersThree },
+  { to: '/system', label: 'System', icon: HardDrives },
+]
+
 export function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const header = usePageHeaderValue()
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  const pending = useQueue('pending')
+  const isAdmin = user?.role === 'admin'
+
+  const pending = useQueue('pending', 100, !isAdmin)
   const pendingCount = pending.data?.length ?? 0
 
   const health = useQuery({
@@ -68,7 +77,6 @@ export function Layout() {
   const online = health.isSuccess && health.data.database === 'ok'
   const probing = health.isPending
 
-  const isAdmin = user?.role === 'admin'
   const initial = (user?.displayName || user?.username || '?').charAt(0).toUpperCase()
 
   return (
@@ -81,7 +89,7 @@ export function Layout() {
         </div>
 
         <nav className="sidebar-nav">
-          {NAV.map(({ to, label, icon: IconCmp }) => (
+          {(isAdmin ? ADMIN_NAV : NAV).map(({ to, label, icon: IconCmp }) => (
             <NavLink
               key={to}
               to={to}
@@ -95,20 +103,6 @@ export function Layout() {
             </NavLink>
           ))}
         </nav>
-
-        {isAdmin && (
-          <div className="sidebar-admin">
-            <div className="admin-label">Admin</div>
-            <NavLink
-              to="/users"
-              className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-              onClick={() => setDrawerOpen(false)}
-            >
-              <UsersThree size={19} />
-              <span className="nav-label">Users</span>
-            </NavLink>
-          </div>
-        )}
 
         <div className="sidebar-foot">
           <div className="server-chip">
@@ -155,10 +149,12 @@ export function Layout() {
               {header.subtitle && <div className="page-subtitle">{header.subtitle}</div>}
             </div>
           </div>
-          <button className="bell-btn" aria-label="Attention items" onClick={() => navigate('/queue')}>
-            <Bell size={18} />
-            {pendingCount > 0 && <span className="bell-dot" />}
-          </button>
+          {!isAdmin && (
+            <button className="bell-btn" aria-label="Attention items" onClick={() => navigate('/queue')}>
+              <Bell size={18} />
+              {pendingCount > 0 && <span className="bell-dot" />}
+            </button>
+          )}
         </header>
 
         <div className="scroll-region">

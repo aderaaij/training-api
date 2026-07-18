@@ -1,22 +1,31 @@
-"""Admin user-management endpoints (the dashboard Users screen).
+"""Admin endpoints (the dashboard Users + System screens).
 
-Mirrors the `app.cli` verbs (list-users / create-user / set-password) plus
-deactivate/reactivate. camelCase on the wire like the auth router. Every route
-is guarded by the router-level admin dependency.
+User management mirrors the `app.cli` verbs (list-users / create-user /
+set-password) plus deactivate/reactivate, per-user token inspection/revoke,
+the auth-events activity feed, and system status (backups, DB size). camelCase
+on the wire like the auth router. Every route is guarded by the router-level
+admin dependency.
 """
 
 import uuid
-from datetime import datetime
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, inspect, select, text
 
 from app.auth import CurrentAdmin, get_current_admin
+from app.auth_events import record_auth_event
+from app.config import get_settings
 from app.database import DbSession
 from app.models.api_token import ApiToken
+from app.models.auth_event import AuthEvent
+from app.models.health_metrics import DailyHealthMetrics
 from app.models.user import User
+from app.models.workout import Workout
 from app.security import hash_password
 
 router = APIRouter(dependencies=[Depends(get_current_admin)])
@@ -37,6 +46,43 @@ class AdminUserOut(_CamelModel):
     token_count: int
     # Max last_used_at across the user's tokens; null = never used a token.
     last_seen_at: datetime | None
+    # Sync freshness — metadata only (timestamps, never content): when the last
+    # workout ROW arrived (created_at, i.e. "is the iPhone still syncing"), and
+    # the most recent day with health metrics.
+    last_workout_sync_at: datetime | None = None
+    last_health_date: date | None = None
+
+
+class AdminTokenOut(_CamelModel):
+    id: uuid.UUID
+    name: str
+    created_at: datetime
+    last_used_at: datetime | None
+    expires_at: datetime | None
+
+
+class AuthEventOut(_CamelModel):
+    id: uuid.UUID
+    event: str
+    username: str | None
+    actor_username: str | None
+    ip: str | None
+    detail: dict[str, Any] | None
+    created_at: datetime
+
+
+class BackupStatus(_CamelModel):
+    file: str
+    size_bytes: int
+    completed_at: datetime
+
+
+class SystemStatus(_CamelModel):
+    backup: BackupStatus | None
+    backup_count: int
+    db_size_bytes: int
+    migration_head: str | None
+    counts: dict[str, int]
 
 
 class CreateUserRequest(_CamelModel):
@@ -102,11 +148,29 @@ def list_users(db: DbSession) -> list[AdminUserOut]:
         .group_by(User.id)
         .order_by(User.created_at)
     ).all()
-    return [_to_out(user, count, seen) for user, count, seen in rows]
+    # Separate aggregates (not joins) — joining three one-to-many tables at
+    # once would fan out the token stats.
+    workout_sync = dict(
+        db.execute(select(Workout.user_id, func.max(Workout.created_at)).group_by(Workout.user_id)).all()
+    )
+    health_date = dict(
+        db.execute(
+            select(DailyHealthMetrics.user_id, func.max(DailyHealthMetrics.date)).group_by(
+                DailyHealthMetrics.user_id
+            )
+        ).all()
+    )
+    out = []
+    for user, count, seen in rows:
+        row = _to_out(user, count, seen)
+        row.last_workout_sync_at = workout_sync.get(user.id)
+        row.last_health_date = health_date.get(user.id)
+        out.append(row)
+    return out
 
 
 @router.post("/users", response_model=AdminUserOut, status_code=status.HTTP_201_CREATED)
-def create_user(body: CreateUserRequest, db: DbSession) -> AdminUserOut:
+def create_user(body: CreateUserRequest, admin: CurrentAdmin, db: DbSession) -> AdminUserOut:
     if db.scalar(select(User).where(User.username == body.username)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
     user = User(
@@ -116,22 +180,28 @@ def create_user(body: CreateUserRequest, db: DbSession) -> AdminUserOut:
         password_hash=hash_password(body.password),
     )
     db.add(user)
+    db.flush()  # assign user.id so the event row can reference it
+    record_auth_event(
+        db, "user_created", username=user.username, user_id=user.id, actor_user_id=admin.id,
+        detail={"role": user.role},
+    )
     db.commit()
     db.refresh(user)
     return _to_out(user, 0, None)
 
 
 @router.post("/users/{user_id}/password", status_code=status.HTTP_204_NO_CONTENT)
-def reset_password(user_id: uuid.UUID, body: ResetPasswordRequest, db: DbSession) -> None:
+def reset_password(user_id: uuid.UUID, body: ResetPasswordRequest, admin: CurrentAdmin, db: DbSession) -> None:
     user = _get_user_or_404(db, user_id)
     user.password_hash = hash_password(body.password)
+    record_auth_event(db, "password_reset", username=user.username, user_id=user.id, actor_user_id=admin.id)
     db.commit()
 
 
 @router.patch("/users/{user_id}", response_model=AdminUserOut)
 def update_user(user_id: uuid.UUID, body: UpdateUserRequest, admin: CurrentAdmin, db: DbSession) -> AdminUserOut:
     user = _get_user_or_404(db, user_id)
-    if body.is_active is not None:
+    if body.is_active is not None and body.is_active != user.is_active:
         if not body.is_active:
             if user.id == admin.id:
                 raise HTTPException(
@@ -140,7 +210,110 @@ def update_user(user_id: uuid.UUID, body: UpdateUserRequest, admin: CurrentAdmin
             # The UI promises "devices stop authenticating immediately" — auth
             # already rejects inactive users, deleting the rows keeps /me tidy.
             db.execute(delete(ApiToken).where(ApiToken.user_id == user.id))
+        record_auth_event(
+            db,
+            "user_deactivated" if not body.is_active else "user_reactivated",
+            username=user.username,
+            user_id=user.id,
+            actor_user_id=admin.id,
+        )
         user.is_active = body.is_active
     db.commit()
     count, seen = _token_stats(db, user.id)
     return _to_out(user, count, seen)
+
+
+# ── per-user tokens ──
+
+
+@router.get("/users/{user_id}/tokens", response_model=list[AdminTokenOut])
+def list_user_tokens(user_id: uuid.UUID, db: DbSession) -> list[AdminTokenOut]:
+    _get_user_or_404(db, user_id)
+    tokens = db.scalars(
+        select(ApiToken).where(ApiToken.user_id == user_id).order_by(ApiToken.created_at)
+    ).all()
+    return [AdminTokenOut.model_validate(t) for t in tokens]
+
+
+@router.delete("/users/{user_id}/tokens/{token_id}", status_code=status.HTTP_204_NO_CONTENT)
+def revoke_user_token(user_id: uuid.UUID, token_id: uuid.UUID, admin: CurrentAdmin, db: DbSession) -> None:
+    user = _get_user_or_404(db, user_id)
+    token = db.get(ApiToken, token_id)
+    if token is None or token.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+    record_auth_event(
+        db, "token_revoked", username=user.username, user_id=user.id, actor_user_id=admin.id,
+        detail={"name": token.name},
+    )
+    db.delete(token)
+    db.commit()
+
+
+# ── activity feed ──
+
+_EVENT_RETENTION = timedelta(days=365)
+
+
+@router.get("/events", response_model=list[AuthEventOut])
+def list_events(db: DbSession, limit: int = 50) -> list[AuthEventOut]:
+    limit = max(1, min(limit, 200))
+    # Opportunistic retention: pruning here (not on the login hot path) keeps
+    # the table bounded without a timer.
+    db.execute(delete(AuthEvent).where(AuthEvent.created_at < datetime.now(timezone.utc) - _EVENT_RETENTION))
+    db.commit()
+    actor = select(User.username).where(User.id == AuthEvent.actor_user_id).scalar_subquery()
+    rows = db.execute(
+        select(AuthEvent, actor.label("actor_username")).order_by(AuthEvent.created_at.desc()).limit(limit)
+    ).all()
+    return [
+        AuthEventOut(
+            id=e.id,
+            event=e.event,
+            username=e.username,
+            actor_username=actor_name,
+            ip=e.ip,
+            detail=e.detail,
+            created_at=e.created_at,
+        )
+        for e, actor_name in rows
+    ]
+
+
+# ── system status ──
+
+
+@router.get("/system", response_model=SystemStatus)
+def system_status(db: DbSession) -> SystemStatus:
+    backup: BackupStatus | None = None
+    backup_count = 0
+    backup_dir = Path(get_settings().backup_dir)
+    if backup_dir.is_dir():
+        dumps = sorted(backup_dir.glob("training-api-*.sql.gz"))
+        backup_count = len(dumps)
+        if dumps:
+            latest = dumps[-1]  # timestamped names sort chronologically
+            stat = latest.stat()
+            backup = BackupStatus(
+                file=latest.name,
+                size_bytes=stat.st_size,
+                completed_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+            )
+    db_size = db.scalar(text("SELECT pg_database_size(current_database())")) or 0
+    # alembic_version is absent when the schema was built by create_all (tests);
+    # check first so the raw query can't poison the session's transaction.
+    migration_head = None
+    if inspect(db.get_bind()).has_table("alembic_version"):
+        migration_head = db.scalar(text("SELECT version_num FROM alembic_version"))
+    counts = {
+        "users": db.scalar(select(func.count(User.id))) or 0,
+        "workouts": db.scalar(select(func.count(Workout.id))) or 0,
+        "healthDays": db.scalar(select(func.count(DailyHealthMetrics.id))) or 0,
+        "authEvents": db.scalar(select(func.count(AuthEvent.id))) or 0,
+    }
+    return SystemStatus(
+        backup=backup,
+        backup_count=backup_count,
+        db_size_bytes=db_size,
+        migration_head=migration_head,
+        counts=counts,
+    )

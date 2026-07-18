@@ -41,6 +41,37 @@ What remains is the polish list.
 - Backend tests run **inside the container**: `docker compose exec app python
   -m pytest` (`python -m` matters — bare `pytest` can't import `app`).
 
+## Done 2026-07-17 — admin dashboard split + monitoring
+
+The admin (role `admin`) manages accounts and isn't an athlete, so the athlete
+screens were hidden and the admin surface grew four monitoring features.
+
+1. **Admin/athlete route split** — `AthleteOnly` guard in `App.tsx` redirects the
+   seven athlete routes (incl. `/`) to `/users` for admins; `Layout.tsx` swaps to an
+   admin nav (Users + System), drops the queue bell/polling. Athlete UX unchanged.
+2. **Per-user token management** (Users screen) — expandable token list per member,
+   `GET /api/admin/users/{id}/tokens`, `DELETE …/{tid}` (revoke one stolen device
+   without deactivating the whole account). 404 on cross-user token id.
+3. **Sync freshness** (Users screen) — `AdminUserOut` gained `lastWorkoutSyncAt`
+   (last workout row's `created_at`) + `lastHealthDate` (newest health day).
+   Metadata only, never content; admins have none so no line shows.
+4. **Auth audit trail + System screen** — `auth_events` table
+   (`models/auth_event.py`) recorded via `app/auth_events.py` on login
+   success/fail/rate-limit, password change/reset, token create/revoke, user
+   create/deactivate/reactivate. `GET /api/admin/events` (prunes >365d on read).
+   New **System** screen (`/system`): backup-freshness card, DB size/counts/migration
+   head (`GET /api/admin/system`), and the activity feed.
+5. **Nightly Postgres backup** (host, outside the repo) — `training-api-backup.timer`
+   → `~/.local/bin/training-api-backup` `pg_dump | gzip` to
+   `/mnt/synology_backups/training-api/` (keeps 30). The app container mounts that dir
+   **read-only** at `/backups` (`BACKUP_DIR` env) so System can report freshness.
+   The DB had zero backups before this. Documented in the root ArdenCore CLAUDE.md.
+
+Tests: `backend/tests/test_auth_admin.py` gained coverage for token list/revoke +
+guards, the events feed (actor vs target), and system-status shape. `system_status`
+guards the `alembic_version` read with `inspect(...).has_table` because the test
+schema is built by `create_all`, not migrations.
+
 ## Done 2026-07-16 — account/token management (former items 1–3)
 
 All camelCase on the wire, like the rest of the auth router.

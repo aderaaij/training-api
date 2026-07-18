@@ -45,10 +45,16 @@ def test_list_users_shape(client_admin, user_a):
     rows = client_admin.get("/api/admin/users").json()
     assert {r["username"] for r in rows} == {"root", "alice"}
     alice = next(r for r in rows if r["username"] == "alice")
-    assert set(alice) == {"id", "username", "displayName", "role", "isActive", "tokenCount", "lastSeenAt"}
+    assert set(alice) == {
+        "id", "username", "displayName", "role", "isActive", "tokenCount", "lastSeenAt",
+        "lastWorkoutSyncAt", "lastHealthDate",
+    }
     assert alice["role"] == "user"
     assert alice["isActive"] is True
     assert alice["tokenCount"] == 1  # the fixture's login token
+    # No seeded workouts/health for the fixture user.
+    assert alice["lastWorkoutSyncAt"] is None
+    assert alice["lastHealthDate"] is None
 
 
 # --- create ------------------------------------------------------------------
@@ -170,3 +176,67 @@ def test_mint_token_validation(client_a):
     # Naive datetimes are rejected — the column is timezone-aware.
     res = client_a.post("/api/auth/tokens", json={"name": "x", "expiresAt": "2030-01-01T00:00:00"})
     assert res.status_code == 422
+
+
+# --- admin token inspection / revoke -----------------------------------------
+
+def test_admin_list_and_revoke_user_token(client_admin, user_a, client_a):
+    uid = str(user_a[0])
+    tokens = client_admin.get(f"/api/admin/users/{uid}/tokens").json()
+    assert len(tokens) == 1 and tokens[0]["name"] == "test-device"
+
+    tid = tokens[0]["id"]
+    assert client_admin.delete(f"/api/admin/users/{uid}/tokens/{tid}").status_code == 204
+    # That device stops authenticating immediately.
+    assert client_a.get("/api/auth/me").status_code == 401
+    assert client_admin.get(f"/api/admin/users/{uid}/tokens").json() == []
+
+
+def test_admin_revoke_token_wrong_user_is_404(client_admin, user_a, user_b):
+    # user_b's token can't be revoked via user_a's id — no cross-user probing.
+    b_tokens = client_admin.get(f"/api/admin/users/{user_b[0]}/tokens").json()
+    res = client_admin.delete(f"/api/admin/users/{user_a[0]}/tokens/{b_tokens[0]['id']}")
+    assert res.status_code == 404
+
+
+def test_admin_token_routes_reject_non_admin(client_a, user_a):
+    assert client_a.get(f"/api/admin/users/{user_a[0]}/tokens").status_code == 403
+
+
+# --- auth events feed --------------------------------------------------------
+
+def test_events_feed_records_login_and_admin_actions(client_admin, user_a):
+    # A failed then successful login.
+    assert _login("alice", "wrong").status_code == 401
+    assert _login("alice", "pw").status_code == 200
+    # An admin action (password reset) with a distinct actor.
+    client_admin.post(f"/api/admin/users/{user_a[0]}/password", json={"password": "brand-new-pw"})
+
+    events = client_admin.get("/api/admin/events").json()
+    kinds = {e["event"] for e in events}
+    assert {"login_failed", "login_success", "password_reset"} <= kinds
+    reset = next(e for e in events if e["event"] == "password_reset")
+    assert reset["username"] == "alice" and reset["actorUsername"] == "root"
+    fail = next(e for e in events if e["event"] == "login_failed")
+    assert fail["username"] == "alice"
+
+
+def test_events_feed_rejects_non_admin(client_a):
+    assert client_a.get("/api/admin/events").status_code == 403
+
+
+# --- system status -----------------------------------------------------------
+
+def test_system_status_shape(client_admin, user_a):
+    body = client_admin.get("/api/admin/system").json()
+    assert set(body) == {"backup", "backupCount", "dbSizeBytes", "migrationHead", "counts"}
+    assert body["dbSizeBytes"] > 0
+    assert "users" in body["counts"] and body["counts"]["users"] >= 2
+    # backup may or may not exist depending on env (the container mounts the NAS
+    # dir; a bare checkout has none). The two must agree, and it never errors.
+    assert body["backupCount"] >= 0
+    assert (body["backup"] is not None) == (body["backupCount"] > 0)
+
+
+def test_system_status_rejects_non_admin(client_a):
+    assert client_a.get("/api/admin/system").status_code == 403

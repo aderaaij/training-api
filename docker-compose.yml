@@ -31,6 +31,11 @@ services:
       # Overrides any ENVIRONMENT in the env_file: run `fastapi run` (production),
       # not the `fastapi dev` file-watcher (see backend/scripts/start.sh).
       ENVIRONMENT: PRODUCTION
+      BACKUP_DIR: /backups
+    volumes:
+      # NAS backup dir (written by training-api-backup.timer on the host) so
+      # the admin System screen can report backup freshness.
+      - /mnt/synology_backups/training-api:/backups:ro
     restart: unless-stopped
 
 volumes:

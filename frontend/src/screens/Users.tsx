@@ -1,12 +1,19 @@
-import { Plus, UsersThree } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, Key, Plus, UsersThree } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
 import { ConfirmDialog, ErrorNote, Loading, Modal, SectionLabel } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { relTime } from '../lib/format'
-import { useAdminUsers, useCreateUser, useResetUserPassword, useSetUserActive } from '../lib/queries'
-import type { AdminUserRow } from '../lib/types'
+import { fmtDay, relTime } from '../lib/format'
+import {
+  useAdminRevokeToken,
+  useAdminUserTokens,
+  useAdminUsers,
+  useCreateUser,
+  useResetUserPassword,
+  useSetUserActive,
+} from '../lib/queries'
+import type { AdminTokenRow, AdminUserRow } from '../lib/types'
 import '../styles/settings.css'
 
 const MIN_PASSWORD = 8
@@ -149,6 +156,68 @@ function ResetPasswordModal({ user, onClose }: { user: AdminUserRow; onClose: ()
   )
 }
 
+function UserTokensPanel({ user }: { user: AdminUserRow }) {
+  const tokens = useAdminUserTokens(user.id)
+  const revoke = useAdminRevokeToken()
+  const [revoking, setRevoking] = useState<AdminTokenRow | null>(null)
+
+  return (
+    <div className="u-tokens-panel">
+      {tokens.error != null && <ErrorNote error={tokens.error} />}
+      {tokens.isLoading && <Loading label="Loading tokens…" />}
+      {tokens.data && tokens.data.length === 0 && (
+        <div className="mono-meta" style={{ padding: '6px 2px' }}>
+          No tokens — no device is logged in for this account.
+        </div>
+      )}
+      {tokens.data?.map((t) => {
+        const expired = t.expiresAt != null && new Date(t.expiresAt).getTime() < Date.now()
+        return (
+          <div className="token-row" key={t.id} style={{ padding: '9px 2px' }}>
+            <span className="icon-tile" style={{ width: 30, height: 30, color: expired ? 'var(--faint)' : 'var(--text-3)' }}>
+              <Key size={15} />
+            </span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="t-name" style={{ fontSize: 13 }}>
+                {t.name || 'Unnamed token'}
+              </div>
+              <div className="t-meta">
+                last used {relTime(t.lastUsedAt)}
+                {t.expiresAt ? ` · ${expired ? 'expired' : 'expires'} ${fmtDay(t.expiresAt)}` : ''}
+              </div>
+            </div>
+            <button className="t-action" style={{ color: 'var(--red)' }} onClick={() => setRevoking(t)}>
+              {expired ? 'Remove' : 'Revoke'}
+            </button>
+          </div>
+        )
+      })}
+      {revoking && (
+        <ConfirmDialog
+          title={`Revoke “${revoking.name || 'this token'}” for ${user.displayName || user.username}?`}
+          body="The device using this token stops authenticating immediately. They can log in again on that device to re-add it."
+          confirmLabel="Revoke"
+          busy={revoke.isPending}
+          onCancel={() => setRevoking(null)}
+          onConfirm={() =>
+            revoke.mutate(
+              { userId: user.id, tokenId: revoking.id },
+              { onSuccess: () => setRevoking(null) },
+            )
+          }
+        />
+      )}
+    </div>
+  )
+}
+
+function syncMeta(u: AdminUserRow): string | null {
+  if (u.role === 'admin') return null // admins aren't athletes — nothing syncs
+  const workout = u.lastWorkoutSyncAt ? relTime(u.lastWorkoutSyncAt) : 'never'
+  const health = u.lastHealthDate ? fmtDay(u.lastHealthDate) : 'never'
+  return `sync ${workout} · health ${health}`
+}
+
 export function Users() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
@@ -157,6 +226,7 @@ export function Users() {
   const [createOpen, setCreateOpen] = useState(false)
   const [resetting, setResetting] = useState<AdminUserRow | null>(null)
   const [deactivating, setDeactivating] = useState<AdminUserRow | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   usePageHeader('User management', 'household accounts')
 
@@ -189,8 +259,11 @@ export function Users() {
           </div>
           {rows.map((u) => {
             const isSelf = u.id === user?.id
+            const expanded = expandedId === u.id
+            const sync = syncMeta(u)
             return (
-              <div className="u-row" key={u.id} style={u.isActive ? undefined : { opacity: 0.55 }}>
+              <div key={u.id}>
+              <div className="u-row" style={u.isActive ? undefined : { opacity: 0.55 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                   <span
                     className="avatar-lg"
@@ -214,11 +287,24 @@ export function Users() {
                 >
                   {u.role === 'admin' ? 'Admin' : 'Member'}
                 </span>
-                <span className="mono-meta hide-sm" style={{ fontSize: 12.5 }}>
+                <button
+                  className="mono-meta hide-sm u-tokens-toggle"
+                  style={{ fontSize: 12.5 }}
+                  title="Show this member's tokens"
+                  onClick={() => setExpandedId(expanded ? null : u.id)}
+                >
                   {u.tokenCount}
-                </span>
-                <span className="mono-meta hide-sm" style={{ fontSize: 11.5 }}>
-                  {u.lastSeenAt ? relTime(u.lastSeenAt) : 'never'}
+                  {expanded ? <CaretDown size={11} weight="bold" /> : <CaretRight size={11} weight="bold" />}
+                </button>
+                <span className="hide-sm" style={{ minWidth: 0 }}>
+                  <span className="mono-meta" style={{ fontSize: 11.5, display: 'block' }}>
+                    {u.lastSeenAt ? relTime(u.lastSeenAt) : 'never'}
+                  </span>
+                  {sync && (
+                    <span className="mono-meta" style={{ fontSize: 10, display: 'block', color: 'var(--faint)', marginTop: 2 }}>
+                      {sync}
+                    </span>
+                  )}
                 </span>
                 <span>
                   <span
@@ -251,6 +337,8 @@ export function Users() {
                       </button>
                     ))}
                 </span>
+              </div>
+              {expanded && <UserTokensPanel user={u} />}
               </div>
             )
           })}

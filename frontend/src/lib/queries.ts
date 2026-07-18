@@ -2,7 +2,9 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { api } from './api'
 import { toDateKey, addDays } from './format'
 import type {
+  AdminTokenRow,
   AdminUserRow,
+  AuthEventRow,
   CalendarResponse,
   ChangePasswordResponse,
   FeedbackItem,
@@ -15,6 +17,7 @@ import type {
   PlanNoteContext,
   PlanScheduleResponse,
   QueueItem,
+  SystemStatus,
   TimedSample,
   WorkoutListItem,
   WorkoutRead,
@@ -86,6 +89,45 @@ export function useSetUserActive() {
     mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
       api.patch<AdminUserRow>(`/api/admin/users/${id}`, { isActive }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['admin-users'] }),
+  })
+}
+
+export function useAdminUserTokens(userId: string | null) {
+  return useQuery({
+    queryKey: ['admin-user-tokens', userId],
+    queryFn: () => api.get<AdminTokenRow[]>(`/api/admin/users/${userId}/tokens`),
+    enabled: userId != null,
+  })
+}
+
+export function useAdminRevokeToken() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ userId, tokenId }: { userId: string; tokenId: string }) =>
+      api.delete(`/api/admin/users/${userId}/tokens/${tokenId}`),
+    onSuccess: (_data, { userId }) => {
+      qc.invalidateQueries({ queryKey: ['admin-user-tokens', userId] })
+      qc.invalidateQueries({ queryKey: ['admin-users'] })
+      qc.invalidateQueries({ queryKey: ['auth-events'] })
+    },
+  })
+}
+
+export function useAuthEvents(enabled: boolean, limit = 50) {
+  return useQuery({
+    queryKey: ['auth-events', limit],
+    queryFn: () => api.get<AuthEventRow[]>('/api/admin/events', { limit }),
+    enabled,
+    refetchInterval: 60_000,
+  })
+}
+
+export function useSystemStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ['system-status'],
+    queryFn: () => api.get<SystemStatus>('/api/admin/system'),
+    enabled,
+    refetchInterval: 60_000,
   })
 }
 
@@ -296,10 +338,11 @@ export function useHealthMetrics(startDate: string, endDate?: string) {
 
 // ── queue ──
 
-export function useQueue(status?: string, limit = 100) {
+export function useQueue(status?: string, limit = 100, enabled = true) {
   return useQuery({
     queryKey: ['queue', status ?? 'all', limit],
     queryFn: () => api.get<QueueItem[]>('/api/queue', { status, limit }),
+    enabled,
   })
 }
 

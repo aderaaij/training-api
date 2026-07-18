@@ -111,6 +111,27 @@
   justify-content: flex-end;
   flex-wrap: wrap;
 }
+.u-tokens-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-3);
+  background: transparent;
+  cursor: pointer;
+}
+.u-tokens-toggle:hover {
+  color: var(--accent);
+}
+.u-tokens-panel {
+  padding: 4px 20px 14px 68px;
+  border-top: 1px solid rgba(245, 235, 220, 0.05);
+  background: rgba(245, 235, 220, 0.02);
+}
+@media (max-width: 640px) {
+  .u-tokens-panel {
+    padding: 4px 16px 12px;
+  }
+}
 .users-table .u-head {
   border-bottom: 1px solid var(--border);
   font-family: var(--font-mono);

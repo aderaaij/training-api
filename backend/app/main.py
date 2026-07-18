@@ -1,12 +1,14 @@
 import os
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI, Request
 from fastapi.responses import FileResponse, JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.auth import get_current_user
+from app.auth_events import client_ip, record_auth_event
+from app.database import SessionLocal
 from app.rate_limit import limiter
 from app.routes import actions, admin, auth, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
 
@@ -20,7 +22,17 @@ SPA_INDEX = SPA_DIST / "index.html"
 
 # Rate limiting (used by /api/auth/login)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _rate_limited(request: Request, exc: Exception):
+    # The route's own DB session is unusable here (the request never entered
+    # the route), so the audit row gets its own short-lived session.
+    with SessionLocal() as db:
+        record_auth_event(db, "login_rate_limited", ip=client_ip(request), commit=True)
+    return _rate_limit_exceeded_handler(request, exc)  # type: ignore[arg-type]
+
+
+app.add_exception_handler(RateLimitExceeded, _rate_limited)
 
 # The server-rendered dashboard is DISABLED. It was unauthenticated and served
 # personal data (health metrics, workouts, plans) over the public Tailscale

@@ -70,6 +70,32 @@ role-guarded, deactivation revokes all tokens; self-service `POST /api/auth/pass
 remains as a fallback. Remaining dashboard work (polish list):
 see `docs/dashboard-next-steps.md`.
 
+**Admin vs athlete dashboard (2026-07-17):** an admin (role `admin`) manages accounts
+and is not an athlete, so the athlete screens (Overview/Calendar/Workouts/Plans/Notes/
+Health/Queue) are hidden for them — the `AthleteOnly` guard in `App.tsx` redirects
+those routes (incl. `/`) to `/users`, and `Layout.tsx` swaps to an admin-only nav
+(Users + System). The athlete experience is byte-for-byte unchanged. Admins keep
+`/settings` (own password/tokens). The two **admin-only screens**:
+- **Users** (`screens/Users.tsx`) — the existing member CRUD, now with an expandable
+  per-user **token list** (`GET/DELETE /api/admin/users/{id}/tokens[/{tid}]`, revoke a
+  single stolen device without nuking the whole account) and a **sync-freshness** line
+  per athlete (`lastWorkoutSyncAt` = when the last workout row arrived, `lastHealthDate`
+  = newest health day). Metadata only — never workout content — so it respects the
+  athlete/admin data boundary. Admins show no sync line (they have no data).
+- **System** (`screens/System.tsx`, `/system`) — backup freshness card (reads the
+  read-only `/backups` mount, green<26h / amber<50h / red), DB size + row counts +
+  Alembic head, and an **auth-activity feed** (`GET /api/admin/events`).
+
+**Auth audit trail:** `auth_events` table (`models/auth_event.py`) + `record_auth_event`
+helper (`app/auth_events.py`) log login success/failed/rate-limited, password
+change/reset, token create/revoke, and user create/deactivate/reactivate. FKs are
+`SET NULL` (trail survives user deletion) and the attempted username is kept as text
+(failed logins never resolve to a user). Events stage on the caller's session so they
+commit atomically with the change they describe; the rate-limit handler (`main.py`)
+uses its own short-lived session. The events endpoint opportunistically prunes rows
+>365d on read (no timer). The publicly-Funnel-exposed login endpoint made this the
+genuinely monitoring-shaped addition — failed-login/rate-limit visibility.
+
 ## Development
 
 ```bash
