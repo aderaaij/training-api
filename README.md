@@ -27,45 +27,83 @@ Built with FastAPI, PostgreSQL, SQLAlchemy, and React. Includes an optional MCP 
 
 ### Prerequisites
 
-- Docker and Docker Compose
+- Docker with Docker Compose
 
 ### 1. Clone and configure
 
 ```bash
 git clone https://github.com/aderaaij/loopback-training-server.git
 cd loopback-training-server
-cp backend/config/.env.example backend/config/.env
+cp .env.example .env
 ```
 
-Edit `backend/config/.env` and set a random `API_KEY`:
-
-```ini
-DATABASE_URL=postgresql+psycopg://training-api:training-api@db:5432/training-api
-API_KEY=your-secret-api-key-here
-ENVIRONMENT=LOCAL
-```
+Edit `.env` and set `BOOTSTRAP_ADMIN_PASSWORD` — the password for the first-run `admin` account. Everything else has a sensible default (the comments in the file explain each one).
 
 ### 2. Start
 
 ```bash
-make up        # or: docker compose up -d
+docker compose up -d      # or: make up
 ```
 
-The API and dashboard will be available at `http://localhost:8001`. Database migrations run automatically on startup.
+The first start builds the image (React dashboard + Python backend, takes a few minutes), runs the database migrations, and creates the `admin` account. The API and dashboard are then at `http://localhost:8001` (verify with `curl http://localhost:8001/api/health`).
 
-### 3. Verify
+### 3. Log in
 
-```bash
-curl http://localhost:8001/api/health
-```
+Open `http://localhost:8001` and sign in as `admin` with the password you set. Admins get the management console (Users + System); regular accounts get the training dashboard.
 
-### 4. Accounts
+If you left `BOOTSTRAP_ADMIN_PASSWORD` empty, logging in stays disabled and the container log tells you how to fix it (`docker compose logs app`).
 
-Migrations seed an `admin` account (password applied from `BOOTSTRAP_ADMIN_PASSWORD` via `python -m app.cli bootstrap`) and register the configured `API_KEY` as a token owned by it, so existing clients keep working after the auth swap. Create users and manage passwords/tokens either in the dashboard (as admin) or via the CLI:
+### 4. Add your household
+
+One instance serves a household, Audiobookshelf-style: a handful of accounts, all data scoped per user, and no open registration — the admin creates every account.
+
+1. As `admin`, open **Users** and create an account for each athlete (role `user`).
+2. Each athlete signs into the **dashboard** with their username + password.
+3. In the **iOS app**, each athlete enters the server URL plus their username + password; the app logs in and stores a per-device token.
+4. Optional AI-coach access: each athlete mints a token in the dashboard (**Settings → Create token**) for their own MCP client (see [MCP Server](#mcp-server-optional)).
+
+Passwords, per-device tokens (revoke one stolen device without touching the rest), and deactivation are all managed in the dashboard. The same operations exist as a CLI fallback:
 
 ```bash
 docker compose exec app python -m app.cli --help
 ```
+
+## Exposing the server
+
+The iOS app and dashboard just need to reach port 8001 — over HTTPS, or over HTTP on a network you trust. Options, safest first:
+
+- **Tailscale (recommended):** install Tailscale on the server and each phone; clients use `http://<machine-name>:8001` inside the tailnet and nothing is exposed to the internet. If the app must also work for people outside your tailnet, [Tailscale Funnel](https://tailscale.com/kb/1223/funnel) can publish the port (e.g. `tailscale funnel --bg --https 8443 8001`).
+- **Reverse proxy:** put Caddy / nginx / Traefik with a real certificate in front and forward to `127.0.0.1:8001`.
+- **LAN only:** fine for trying it out, but the app syncs in the background, so a phone that leaves the house needs one of the options above.
+
+If the server ends up publicly reachable: login is rate-limited (5/min/IP), there is no registration endpoint, and the admin System screen shows an auth audit trail — but public exposure still means **strong passwords on every account**.
+
+## Backups
+
+The Postgres volume is the only state worth backing up. A nightly `pg_dump` on the host is enough:
+
+```bash
+# crontab -e
+30 3 * * * docker exec postgres__training-api pg_dump -U training-api training-api | gzip > /path/to/backups/training-api-$(date +\%F).sql.gz
+```
+
+Point `BACKUP_HOST_DIR` in `.env` at that directory and the admin **System** screen reports backup freshness (green < 26 h old). Restore with `gunzip -c <dump>.sql.gz | docker exec -i postgres__training-api psql -U training-api training-api`.
+
+## Configuration
+
+Everything is configured through environment variables in the root `.env` (read by Docker Compose):
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `BOOTSTRAP_ADMIN_PASSWORD` | *(unset)* | First-run admin password; applied only while the admin has none, so rotating it later is a no-op |
+| `BOOTSTRAP_ADMIN_USERNAME` | `admin` | First-run admin username |
+| `POSTGRES_PASSWORD` / `POSTGRES_USER` / `POSTGRES_DB` | `training-api` | Database credentials (not published outside the compose network; also fed to the app as `DATABASE_URL`) |
+| `API_PORT` | `8001` | Host port for the API + dashboard |
+| `BACKUP_HOST_DIR` | `./backups` | Host directory with `pg_dump` files, mounted read-only for the System screen |
+
+Running the backend outside Docker reads `backend/config/.env` instead (template: `backend/config/.env.example`).
+
+**Upgrading from a pre-auth version:** keep your old `API_KEY` set in `backend/config/.env` — the migration seeds it as a token owned by the admin account, so existing clients keep working while you move them to per-user tokens.
 
 ## Web dashboard
 
@@ -90,7 +128,7 @@ All endpoints except `/api/health` and `/api/auth/login` require a `Bearer` toke
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/auth/login` | Log in, mint a per-device token (wrong password is 400, not 401) |
+| `POST` | `/api/auth/login` | Log in, mint a per-device token (bad credentials → 401) |
 | `GET` | `/api/auth/me` | Current user + their tokens |
 | `POST` | `/api/auth/password` | Change own password (revokes every *other* token) |
 | `POST` | `/api/auth/tokens` | Mint a named token (shown once; optional `expiresAt`) |
@@ -206,7 +244,7 @@ cd mcp
 cp config/.env.example config/.env
 ```
 
-Edit `mcp/config/.env` — set `TRAINING_API_KEY` to a token minted for the account the MCP should act as:
+Edit `mcp/config/.env` — set `TRAINING_API_KEY` to a token for the account the MCP should act as (mint one in the dashboard: **Settings → Create token**):
 
 ```ini
 TRAINING_API_URL=http://localhost:8001
@@ -243,11 +281,12 @@ docker compose exec app python -m pytest
 
 ```
 ├── docker-compose.yml          # PostgreSQL + API orchestration
+├── .env.example                # Compose configuration template (copy to .env)
 ├── Makefile                    # Dev shortcuts
 ├── backend/
 │   ├── Dockerfile              # Multi-stage build: Node (frontend) + Python 3.13 (uv); context = repo root
 │   ├── pyproject.toml          # Dependencies (uv/hatch)
-│   ├── config/.env.example     # Environment template
+│   ├── config/.env.example     # Env template for running outside Docker
 │   ├── app/
 │   │   ├── main.py             # FastAPI app (+ serves the SPA build)
 │   │   ├── config.py           # Settings (pydantic-settings)

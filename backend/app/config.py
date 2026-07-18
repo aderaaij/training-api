@@ -12,10 +12,11 @@ class Settings(BaseSettings):
     )
 
     database_url: str
-    # Legacy single-user key. Since the multi-user migration it is seeded as a
-    # token owned by the bootstrap admin (so existing clients keep working); new
-    # clients authenticate with per-user tokens from /api/auth/login.
-    api_key: str
+    # Legacy single-user key, pre-dating per-user tokens. When set, the seed
+    # migration registers it as a token owned by the bootstrap admin (so clients
+    # from before the auth swap keep working). Fresh installs leave it unset;
+    # everyone authenticates with per-user tokens from /api/auth/login.
+    api_key: str | None = None
     environment: str = "LOCAL"
     db_host: str | None = None
     # Read-only mount of the NAS backup dir (docker-compose); the admin System

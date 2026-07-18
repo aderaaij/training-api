@@ -25,13 +25,28 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    env_file: ./backend/config/.env
+    # Optional extra app config (also used when running the backend outside
+    # Docker). A containerized install needs no file here: everything below is
+    # derived from this compose file's own variables (see .env.example).
+    env_file:
+      - path: ./backend/config/.env
+        required: false
     environment:
-      DB_HOST: db
-      # Overrides any ENVIRONMENT in the env_file: run `fastapi run` (production),
-      # not the `fastapi dev` file-watcher (see backend/scripts/start.sh).
-      ENVIRONMENT: PRODUCTION
-      BACKUP_DIR: /backups
+      # Derived from the same POSTGRES_* variables as the db service, so the
+      # two can never drift. Point at an external database instead via a
+      # docker-compose.override.yml.
+      - DATABASE_URL=postgresql+psycopg://${POSTGRES_USER:-training-api}:${POSTGRES_PASSWORD:-training-api}@db:5432/${POSTGRES_DB:-training-api}
+      # Run `fastapi run` (production), not the `fastapi dev` file-watcher
+      # (see backend/scripts/start.sh).
+      - ENVIRONMENT=PRODUCTION
+      - BACKUP_DIR=/backups
+      # First-run admin account (password applied only while the admin has
+      # none — see README "Quick Start"). Set these in the root .env: they pass
+      # through from there, and when unset the variables are absent in the
+      # container — which also masks any BOOTSTRAP_* in backend/config/.env
+      # (that file's copies only apply to non-Docker runs).
+      - BOOTSTRAP_ADMIN_USERNAME
+      - BOOTSTRAP_ADMIN_PASSWORD
     volumes:
       # Host dir holding DB backup dumps, so the admin System screen can report
       # backup freshness. Point it at your real backup location via

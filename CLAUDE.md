@@ -61,7 +61,9 @@ purpose. Don't "normalize" one side without the other.
 
 Login is rate-limited (5/min/IP). On any 401 the SPA wipes its token and returns to
 the login screen. The bearer token lives in localStorage (`loopback.*` keys). Because
-of that 401 contract, auth endpoints signal "wrong password" with **400, never 401**.
+of that 401 contract, *authenticated* endpoints that check a password signal "wrong
+password" with **400, never 401** (e.g. `POST /api/auth/password` on a wrong current
+password). Login itself 401s on bad credentials — there is no token to wipe yet.
 
 Account management is fully in the dashboard (admin CRUD on `/api/admin/users` —
 role-guarded, deactivation revokes all tokens; self-service `POST /api/auth/password`
@@ -107,7 +109,9 @@ make migrate                     # Run Alembic migrations
 make create_migration m="desc"   # Create new migration
 ```
 
-The API runs on port **8001**. Auth is via `Authorization: Bearer <API_KEY>` header. The `/health` and `/dashboard` endpoints are unauthenticated.
+The API runs on port **8001**. Auth is per-user: `POST /api/auth/login` mints opaque `tapi_` bearer tokens (argon2 passwords, SHA-256-hashed tokens); only `/api/health` and `/api/auth/login` are unauthenticated.
+
+**Configuration (since Phase 6, 2026-07-18):** a containerized install is configured entirely from the repo-root `.env` (template `.env.example`) — compose derives `DATABASE_URL` from the same `POSTGRES_*` variables the db service uses and passes `BOOTSTRAP_ADMIN_USERNAME`/`BOOTSTRAP_ADMIN_PASSWORD` through only when set. `backend/config/.env` is optional (compose `env_file` is `required: false`): it's for running the backend outside Docker, and on upgraded pre-auth installs it may still hold the legacy `API_KEY` (now optional in `Settings`; when present the seed migration registers it as an admin-owned token). First boot with no admin password logs a loud warning with the fix.
 
 ## Database
 
