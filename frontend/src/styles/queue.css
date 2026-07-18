@@ -1,0 +1,117 @@
+.queue-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1020px) {
+  .queue-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.queue-card {
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 16px 18px;
+}
+.queue-card .q-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.queue-card .q-title {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+}
+.queue-card .q-meta {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.queue-card .q-steps {
+  display: flex;
+  gap: 6px;
+  margin-top: 13px;
+}
+.queue-card .q-step {
+  text-align: center;
+  padding: 7px 4px;
+  border-radius: 8px;
+  background: var(--input-bg);
+  min-width: 0;
+}
+.queue-card .q-step .st-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.queue-card .q-del {
+  color: var(--faint);
+  padding: 4px;
+  display: flex;
+}
+.queue-card .q-del:hover {
+  color: var(--red);
+}
+
+.fb-card {
+  border-radius: 16px;
+  background: #1a140c;
+  border: 1px solid rgba(232, 163, 61, 0.28);
+  padding: 16px 18px;
+}
+.fb-card.done {
+  background: var(--card);
+  border-color: var(--border);
+}
+.fb-card .fb-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+}
+.fb-card .fb-title {
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.fb-card .fb-date {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.fb-card .fb-facts {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+.fb-card .fb-ack {
+  margin-top: 13px;
+  width: 100%;
+  text-align: center;
+  padding: 10px;
+  border-radius: 11px;
+  background: var(--tile-bg);
+  border: 1px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.fb-card .fb-acked {
+  margin-top: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--green);
+}

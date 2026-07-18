@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+build/
+
+# Environment files (contain secrets)
+.env
+backend/config/.env
+mcp/config/.env
+
+# Deployment-specific compose overrides (host paths etc.)
+docker-compose.override.yml
+
+# Local working notes (handoff docs, plans) — not part of the shared repo
+docs/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

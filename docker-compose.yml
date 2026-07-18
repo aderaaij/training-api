@@ -1,0 +1,43 @@
+services:
+  db:
+    image: postgres:16
+    container_name: postgres__training-api
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-training-api}
+      POSTGRES_USER: ${POSTGRES_USER:-training-api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-training-api}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-training-api}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend__training-api
+    ports:
+      - "${API_PORT:-8001}:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: ./backend/config/.env
+    environment:
+      DB_HOST: db
+      # Overrides any ENVIRONMENT in the env_file: run `fastapi run` (production),
+      # not the `fastapi dev` file-watcher (see backend/scripts/start.sh).
+      ENVIRONMENT: PRODUCTION
+      BACKUP_DIR: /backups
+    volumes:
+      # Host dir holding DB backup dumps, so the admin System screen can report
+      # backup freshness. Point it at your real backup location via
+      # BACKUP_HOST_DIR or a docker-compose.override.yml.
+      - ${BACKUP_HOST_DIR:-./backups}:/backups:ro
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

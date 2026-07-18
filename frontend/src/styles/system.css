@@ -1,0 +1,37 @@
+.system-wrap {
+  max-width: 900px;
+}
+
+.sys-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+@media (max-width: 640px) {
+  .sys-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sys-card {
+  border-radius: 18px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 18px 20px;
+}
+.sys-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.sys-big {
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.4px;
+}
+.sys-meta {
+  margin-top: 6px;
+  font-size: 11px;
+  line-height: 1.6;
+}

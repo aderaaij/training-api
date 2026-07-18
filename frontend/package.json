@@ -1,0 +1,37 @@
+{
+  "name": "frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "oxlint",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/hanken-grotesk": "^5.2.8",
+    "@fontsource/jetbrains-mono": "^5.2.8",
+    "@fontsource/space-grotesk": "^5.2.10",
+    "@phosphor-icons/react": "^2.1.10",
+    "@tanstack/react-query": "^5.101.2",
+    "leaflet": "^1.9.4",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.18.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.0-rc.4",
+    "@rolldown/plugin-babel": "^0.2.3",
+    "@types/babel__core": "^7.20.5",
+    "@types/leaflet": "^1.9.21",
+    "@types/node": "^24.13.2",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.3",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "oxlint": "^1.71.0",
+    "typescript": "~6.0.2",
+    "vite": "^8.1.1"
+  }
+}

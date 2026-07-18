@@ -1,0 +1,197 @@
+.notes-grid {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 1020px) {
+  .notes-grid {
+    grid-template-columns: 1fr;
+  }
+  .coach-panel {
+    position: static !important;
+  }
+}
+
+.note-filters {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.note-filters .filter-chip {
+  padding: 7px 13px;
+  font-size: 12.5px;
+}
+
+.note-card {
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  padding: 16px 18px;
+}
+.note-card.expired {
+  opacity: 0.55;
+}
+.note-card .n-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 9px;
+  flex-wrap: wrap;
+}
+.note-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: 8px;
+}
+.note-expired-tag {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--muted);
+  background: rgba(245, 235, 220, 0.06);
+  padding: 3px 8px;
+  border-radius: 7px;
+  text-transform: uppercase;
+}
+.note-card .n-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.note-card .n-actions button {
+  color: var(--faint);
+  padding: 3px;
+  display: flex;
+}
+.note-card .n-actions button:hover {
+  color: var(--text-2);
+}
+.note-card .n-summary {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.45;
+}
+.note-card .n-body {
+  font-size: 12.5px;
+  color: var(--text-3);
+  line-height: 1.55;
+  margin-top: 7px;
+  white-space: pre-wrap;
+}
+.note-card .n-foot {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--faint);
+  flex-wrap: wrap;
+}
+.note-card .n-foot .f-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* coach panel */
+.coach-panel {
+  position: sticky;
+  top: 0;
+  border-radius: 22px;
+  background: linear-gradient(168deg, #1b1610, #0f0c07);
+  border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  padding: 22px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+}
+.coach-panel .cp-glow {
+  position: absolute;
+  top: -30px;
+  right: -20px;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, transparent), transparent 70%);
+}
+.coach-panel > * {
+  position: relative;
+}
+.coach-panel .cp-title {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 600;
+}
+.coach-panel .cp-endpoint {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--muted);
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+}
+.coach-panel .cp-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 11px 13px;
+  border-radius: 12px;
+}
+.coach-panel .cp-banner.fresh {
+  background: rgba(95, 185, 138, 0.1);
+  border: 1px solid rgba(95, 185, 138, 0.25);
+}
+.coach-panel .cp-banner.stale {
+  background: rgba(232, 163, 61, 0.1);
+  border: 1px solid rgba(232, 163, 61, 0.25);
+}
+.coach-panel .cp-banner .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.coach-panel .cp-banner span.text {
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.coach-panel .cp-plan {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.coach-panel .cp-note {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 11px;
+  border-radius: 10px;
+  background: var(--input-bg);
+  border-left: 2.5px solid var(--accent);
+}
+.coach-panel .cp-note .k {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  width: 70px;
+  flex-shrink: 0;
+}
+.coach-panel .cp-note .t {
+  font-size: 12px;
+  color: var(--text-2);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

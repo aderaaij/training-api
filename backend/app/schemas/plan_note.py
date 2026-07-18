@@ -1,0 +1,55 @@
+import uuid
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from app.schemas.plan import PlanRead
+
+
+VALID_KINDS = {"decision", "preference", "constraint", "life_context", "observation", "blocker"}
+
+
+class PlanNoteCreate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: str = Field(pattern=r"^(decision|preference|constraint|life_context|observation|blocker)$")
+    summary: str = Field(min_length=1, max_length=280)
+    body: str | None = None
+    importance: int = Field(default=2, ge=1, le=3)
+    conversation_id: str | None = Field(default=None, alias="conversationId", max_length=64)
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
+    plan_id: uuid.UUID | None = Field(default=None, alias="planId")
+
+
+class PlanNoteUpdate(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    kind: str | None = Field(default=None, pattern=r"^(decision|preference|constraint|life_context|observation|blocker)$")
+    summary: str | None = Field(default=None, min_length=1, max_length=280)
+    body: str | None = None
+    importance: int | None = Field(default=None, ge=1, le=3)
+    expires_at: datetime | None = Field(default=None, alias="expiresAt")
+
+
+class PlanNoteRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+    id: uuid.UUID
+    plan_id: uuid.UUID | None = Field(serialization_alias="planId")
+    kind: str
+    summary: str
+    body: str | None
+    importance: int
+    conversation_id: str | None = Field(serialization_alias="conversationId")
+    expires_at: datetime | None = Field(serialization_alias="expiresAt")
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlanContext(BaseModel):
+    """Aggregated continuity context for an LLM conversation."""
+
+    plan: PlanRead | None
+    notes: list[PlanNoteRead]
+    last_note_age_days: int | None
+    continuity_hint: str
