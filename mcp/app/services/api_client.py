@@ -71,6 +71,17 @@ class TrainingClient:
             response.raise_for_status()
             return response.json()
 
+    async def _delete(self, path: str, noun: str) -> dict:
+        """DELETE a resource. Separate from _request because a 204 has no JSON body."""
+        url = f"{self.base_url}{path}"
+        headers = {"Authorization": self._resolve_auth()}
+        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
+            response = await http_client.request("DELETE", url, headers=headers)
+            if response.status_code == 404:
+                raise ValueError(f"{noun} not found: {path}")
+            response.raise_for_status()
+            return {"deleted": path.rsplit("/", 1)[-1]}
+
     async def list_workouts(
         self,
         activity_type: str | None = None,
@@ -92,16 +103,13 @@ class TrainingClient:
         """Get a single workout by ID."""
         return await self._request("GET", f"/api/workouts/{workout_id}")
 
+    async def get_workout_context(self, workout_id: str) -> list | dict:
+        """Get plan linkage context (queue item, plan, feedback) for a workout."""
+        return await self._request("GET", f"/api/workouts/{workout_id}/context")
+
     async def delete_workout(self, workout_id: str) -> dict:
         """Delete a workout by ID."""
-        self._ensure_configured()
-        url = f"{self.base_url}/api/workouts/{workout_id}"
-        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
-            response = await http_client.request("DELETE", url, headers=self.headers)
-            if response.status_code == 404:
-                raise ValueError(f"Workout not found: {workout_id}")
-            response.raise_for_status()
-            return {"deleted": workout_id}
+        return await self._delete(f"/api/workouts/{workout_id}", "Workout")
 
     async def get_workout_splits(self, workout_id: str) -> list | dict:
         """Get splits for a workout."""
@@ -362,14 +370,7 @@ class TrainingClient:
 
     async def delete_plan_note(self, note_id: str) -> dict:
         """Delete a plan note."""
-        self._ensure_configured()
-        url = f"{self.base_url}/api/plan-notes/{note_id}"
-        async with httpx.AsyncClient(timeout=self.timeout) as http_client:
-            response = await http_client.request("DELETE", url, headers=self.headers)
-            if response.status_code == 404:
-                raise ValueError(f"Note not found: {note_id}")
-            response.raise_for_status()
-            return {"deleted": note_id}
+        return await self._delete(f"/api/plan-notes/{note_id}", "Note")
 
     async def get_health_metrics(
         self,

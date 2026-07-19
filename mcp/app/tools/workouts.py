@@ -87,6 +87,40 @@ async def get_workout_detail(workout_id: str) -> dict | list:
 
 
 @workouts_router.tool
+async def get_workout_context(workout_id: str) -> dict | list:
+    """
+    Get the server-held plan linkage for a recorded workout: the queued session
+    it fulfilled, the training plan behind that session, and any missed-workout
+    feedback filed against it.
+
+    Args:
+        workout_id: UUID of the workout (same id as get_recent_runs /
+                    get_workout_detail return).
+
+    Returns:
+        Object with workout_id, plan_workout_id, and three nullable keys:
+        - queue_item: title, description, activity_type, live status (e.g.
+          "completed", "skipped"), scheduled_date, plan_id, the workout_data
+          composition that was planned, completed_at.
+        - plan: id, name, activity_type, status, start_date, end_date.
+        - feedback: reason, reason_note, action (move/adjust/skip), new_date,
+          scheduled_date, dismissed, created_at. Survives queue-item deletion.
+
+        All three null (with plan_workout_id null) means an unplanned run —
+        that's normal, not an error.
+
+    Useful when reviewing a completed workout: compare what was planned
+    (queue_item.workout_data) against what happened, and see what the athlete
+    said about the session.
+    """
+    try:
+        return await client.get_workout_context(workout_id)
+    except Exception as e:
+        logger.exception(f"Error in get_workout_context: {e}")
+        return {"error": str(e)}
+
+
+@workouts_router.tool
 async def get_workout_splits(workout_id: str) -> dict | list:
     """
     Get per-split data for a workout (e.g. per-km or per-mile splits).
