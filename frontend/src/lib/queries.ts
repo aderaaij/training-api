@@ -20,6 +20,7 @@ import type {
   QueueItem,
   SystemStatus,
   TimedSample,
+  WorkoutContext,
   WorkoutListItem,
   WorkoutRead,
   WorkoutSplit,
@@ -186,6 +187,14 @@ export function useWorkout(id: string | undefined) {
   return useQuery({
     queryKey: ['workout', id],
     queryFn: () => api.get<WorkoutRead>(`/api/workouts/${id}`),
+    enabled: !!id,
+  })
+}
+
+export function useWorkoutContext(id: string | undefined) {
+  return useQuery({
+    queryKey: ['workout', id, 'context'],
+    queryFn: () => api.get<WorkoutContext>(`/api/workouts/${id}/context`),
     enabled: !!id,
   })
 }

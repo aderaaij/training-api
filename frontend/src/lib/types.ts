@@ -104,6 +104,48 @@ export interface WorkoutRead extends WorkoutListItem {
   data: Record<string, unknown>
 }
 
+/** GET /api/workouts/{id}/context — server-held plan linkage for a workout.
+ *  All three embeds nullable; entirely null for an unplanned run. Note the
+ *  embedded feedback is snake_case, unlike the camelCase feedback resource. */
+export interface WorkoutContext {
+  workout_id: string
+  plan_workout_id: string | null
+  queue_item: WorkoutContextQueueItem | null
+  plan: WorkoutContextPlan | null
+  feedback: WorkoutContextFeedback | null
+}
+
+export interface WorkoutContextQueueItem {
+  id: string
+  title: string
+  description: string | null
+  activity_type: string
+  status: string // live status: pending | fetched | synced | completed | skipped
+  scheduled_date: string | null
+  plan_id: string | null
+  workout_data: WorkoutComposition | null
+  completed_at: string | null
+}
+
+export interface WorkoutContextPlan {
+  id: string
+  name: string
+  activity_type: string
+  status: string
+  start_date: string
+  end_date: string | null
+}
+
+export interface WorkoutContextFeedback {
+  reason: string
+  reason_note: string | null
+  action: string // move | adjust | skip
+  new_date: string | null
+  scheduled_date: string
+  dismissed: boolean
+  created_at: string
+}
+
 export interface WorkoutSummaryRow {
   period: string
   activity_type: string | null

@@ -1,6 +1,6 @@
 import { BracketsCurly, CaretDown, CaretUp, Trash } from '@phosphor-icons/react'
 import { Suspense, lazy, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
 
 // Leaflet is ~150 kB — only fetched when a workout actually has a route.
@@ -13,7 +13,7 @@ import {
   linePath,
   zoneBands,
 } from '../components/charts'
-import { ConfirmDialog, ErrorNote, Loading, SectionLabel } from '../components/ui'
+import { ConfirmDialog, ErrorNote, Loading, SectionLabel, StatusPill } from '../components/ui'
 import { activityMeta, sourceMeta } from '../lib/activity'
 import {
   fmtDayYear,
@@ -24,8 +24,8 @@ import {
 } from '../lib/format'
 import {
   useDeleteWorkout,
-  useQueue,
   useWorkout,
+  useWorkoutContext,
   useWorkoutHeartRate,
   useWorkoutSplits,
 } from '../lib/queries'
@@ -34,6 +34,7 @@ import type {
   RoutePoint,
   TimedSample,
   WorkoutComposition,
+  WorkoutContext,
   WorkoutSplit,
 } from '../lib/types'
 import '../styles/workouts.css'
@@ -249,6 +250,54 @@ function PlannedVsActual({
   )
 }
 
+const FEEDBACK_ACTION_LABEL: Record<string, string> = {
+  skip: 'Skipped',
+  move: 'Moved',
+  adjust: 'Adjusted',
+}
+
+function PlanLinkCard({ context }: { context: WorkoutContext }) {
+  const qi = context.queue_item
+  const fb = context.feedback
+  const plan = context.plan
+  if (!qi && !fb) return null
+
+  return (
+    <div className="chart-card" style={{ background: 'var(--card)' }}>
+      <div className="chart-head">
+        <SectionLabel>Planned session</SectionLabel>
+        {qi && <StatusPill status={qi.status} />}
+      </div>
+      {qi && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+          <div style={{ fontSize: 14.5, fontWeight: 600 }}>{qi.title}</div>
+          {qi.scheduled_date && (
+            <div className="mono-meta">
+              scheduled {fmtDayYear(qi.scheduled_date)} · {fmtTime(qi.scheduled_date)}
+            </div>
+          )}
+          {plan && (
+            <div style={{ fontSize: 13, color: 'var(--muted)' }}>
+              Part of{' '}
+              <Link to={`/plans/${plan.id}`} style={{ color: 'var(--accent)', fontWeight: 600 }}>
+                {plan.name}
+              </Link>{' '}
+              ({plan.status})
+            </div>
+          )}
+        </div>
+      )}
+      {fb && !fb.dismissed && (
+        <div style={{ fontSize: 13, color: 'var(--amber)', marginTop: qi ? 10 : 4, lineHeight: 1.5 }}>
+          {FEEDBACK_ACTION_LABEL[fb.action] ?? fb.action} — {fb.reason}
+          {fb.reason_note ? ` · ${fb.reason_note}` : ''}
+          {fb.new_date ? ` → ${fmtDayYear(fb.new_date)}` : ''}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Splits({ splits }: { splits: WorkoutSplit[] }) {
   const usable = splits.filter((s) => s.pace != null || (s.duration != null && s.distance != null))
   if (usable.length === 0) return null
@@ -352,7 +401,7 @@ export function WorkoutDetail() {
   const { data: workout, isLoading, error } = useWorkout(id)
   const { data: splits } = useWorkoutSplits(id)
   const { data: heartRate } = useWorkoutHeartRate(id)
-  const { data: queueItems } = useQueue(undefined, 200)
+  const { data: context } = useWorkoutContext(id)
   const deleteWorkout = useDeleteWorkout()
   const [rawOpen, setRawOpen] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -387,10 +436,7 @@ export function WorkoutDetail() {
     return Math.round(hrSamples.reduce((a, s) => a + s.value, 0) / hrSamples.length)
   }, [hrSamples])
 
-  const queueItem = useMemo(
-    () => (workout?.plan_workout_id ? queueItems?.find((q) => q.id === workout.plan_workout_id) : undefined),
-    [workout, queueItems],
-  )
+  const queueItem = context?.queue_item
 
   const rawJson = useMemo(() => {
     if (!workout) return ''
@@ -459,6 +505,8 @@ export function WorkoutDetail() {
           />
         </div>
       )}
+
+      {context && <PlanLinkCard context={context} />}
 
       {queueItem?.workout_data && (
         <PlannedVsActual
