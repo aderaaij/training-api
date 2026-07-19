@@ -279,6 +279,91 @@ The default transport is stdio (for direct MCP clients like Claude Desktop). Set
 
 **Multi-user:** an `Authorization` header on an incoming HTTP MCP request is forwarded to the backend as-is, so each caller acts as their own user. Set `REQUIRE_AUTH_HEADER=true` to disable the `TRAINING_API_KEY` fallback entirely.
 
+### Connect a client
+
+Once it's serving HTTP (`MCP_TRANSPORT=http`), any MCP client can reach the
+server at `http://<machine-name>:8590/mcp`. Each person authenticates with their
+**own** token in an `Authorization: Bearer` header (mint one in the dashboard:
+**Settings → Create token**), so the data is scoped to their account — this is
+the "point your own Claude (or any LLM) at it" path. Substitute your tailnet
+machine name and token in the snippets below.
+
+**Claude Code**
+
+```bash
+claude mcp add training --transport http \
+  http://<machine-name>:8590/mcp \
+  --header "Authorization: Bearer <your-token>"
+```
+
+**Claude Desktop** — bridge remote HTTP via [`mcp-remote`](https://github.com/geelen/mcp-remote) (the `Authorization:${AUTH_HEADER}` form sidesteps an arg-parsing bug with spaces in header values; `--allow-http` is required for plain-http hosts other than localhost — fine here, since tailnet traffic is WireGuard-encrypted end to end). Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "training": {
+      "command": "npx",
+      "args": [
+        "-y", "mcp-remote",
+        "http://<machine-name>:8590/mcp",
+        "--header", "Authorization:${AUTH_HEADER}",
+        "--allow-http"
+      ],
+      "env": { "AUTH_HEADER": "Bearer <your-token>" }
+    }
+  }
+}
+```
+
+**Cursor** (`~/.cursor/mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "training": {
+      "url": "http://<machine-name>:8590/mcp",
+      "headers": { "Authorization": "Bearer <your-token>" }
+    }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json` — the `inputs` block prompts for the token on first use and keeps it out of the file, which matters if you commit `.vscode/`)
+
+```json
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "training-token",
+      "description": "Training API token",
+      "password": true
+    }
+  ],
+  "servers": {
+    "training": {
+      "type": "http",
+      "url": "http://<machine-name>:8590/mcp",
+      "headers": { "Authorization": "Bearer ${input:training-token}" }
+    }
+  }
+}
+```
+
+Any other MCP client works the same way — a streamable-HTTP URL plus a bearer
+header (Cline, the OpenAI Agents SDK's `MCPServerStreamableHttp`, LangChain's
+`langchain-mcp-adapters`, and so on). The server speaks plain MCP, so the model
+behind the client is your choice. Sanity-check a new setup with
+`npx @modelcontextprotocol/inspector`.
+
+**Reachability:** clients that run on your own machine (the four above) reach the
+server directly over the tailnet. Cloud-hosted connectors — claude.ai's web
+connectors, OpenAI's *hosted* MCP tool — call from the provider's servers
+instead, so they need a publicly reachable URL ([Tailscale
+Funnel](https://tailscale.com/kb/1223/funnel) or a reverse proxy), and
+claude.ai's connector flow additionally expects OAuth, which this bearer-token
+setup doesn't advertise.
+
 ## Development
 
 ```bash
