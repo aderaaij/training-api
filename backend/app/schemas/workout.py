@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -77,6 +77,55 @@ class WorkoutList(BaseModel):
     effort_score: float | None
     estimated_effort_score: float | None
     created_at: datetime
+
+
+class WorkoutContextQueueItem(BaseModel):
+    """Queue-item embed for the context endpoint. Includes the workout_data
+    composition so consumers can render planned-vs-actual without a second
+    queue lookup."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    description: str | None
+    activity_type: str
+    status: str
+    scheduled_date: datetime | None
+    plan_id: uuid.UUID | None
+    workout_data: dict | None
+    completed_at: datetime | None
+
+
+class WorkoutContextPlan(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    activity_type: str
+    status: str
+    start_date: date
+    end_date: date | None
+
+
+class WorkoutContextFeedback(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    reason: str
+    reason_note: str | None
+    action: str
+    new_date: datetime | None
+    scheduled_date: datetime
+    dismissed: bool
+    created_at: datetime
+
+
+class WorkoutContextRead(BaseModel):
+    workout_id: uuid.UUID
+    plan_workout_id: uuid.UUID | None
+    queue_item: WorkoutContextQueueItem | None
+    plan: WorkoutContextPlan | None
+    feedback: WorkoutContextFeedback | None
 
 
 class WorkoutSummary(BaseModel):

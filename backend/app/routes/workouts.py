@@ -6,8 +6,19 @@ from sqlalchemy import func, select
 
 from app.auth import CurrentUser
 from app.database import DbSession
+from app.models.feedback import WorkoutFeedback
+from app.models.plan import Plan
+from app.models.queue import WorkoutQueue
 from app.models.workout import Workout
-from app.schemas.workout import WorkoutCreate, WorkoutList, WorkoutRead, WorkoutSummary
+from app.routes.queue import _scheduled_date_from_data
+from app.schemas.workout import (
+    WorkoutContextQueueItem,
+    WorkoutContextRead,
+    WorkoutCreate,
+    WorkoutList,
+    WorkoutRead,
+    WorkoutSummary,
+)
 from app.tenancy import get_owned
 
 router = APIRouter()
@@ -140,6 +151,47 @@ def get_workout_splits(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
 def get_workout_heartrate(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
     workout = get_owned(db, Workout, workout_id, user)
     return workout.data.get("heartRate", workout.data.get("heartRateSamples", []))
+
+
+@router.get("/{workout_id}/context", response_model=WorkoutContextRead)
+def get_workout_context(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
+    """Server-held linkage for a recorded workout: the queue item it fulfilled
+    (via plan_workout_id), the plan behind that item, and any feedback filed
+    against it. Every key is null for a workout that never matched a queued
+    session, so clients can call this unconditionally."""
+    workout = get_owned(db, Workout, workout_id, user)
+
+    queue_item = plan = feedback = None
+    if workout.plan_workout_id is not None:
+        queue_row = db.scalars(
+            select(WorkoutQueue).where(
+                WorkoutQueue.id == workout.plan_workout_id,
+                WorkoutQueue.user_id == user.id,
+            )
+        ).first()
+        if queue_row is not None:
+            queue_item = WorkoutContextQueueItem.model_validate(queue_row)
+            if queue_item.scheduled_date is None:
+                queue_item.scheduled_date = _scheduled_date_from_data(queue_row.workout_data)
+            if queue_row.plan_id is not None:
+                plan = db.scalars(
+                    select(Plan).where(Plan.id == queue_row.plan_id, Plan.user_id == user.id)
+                ).first()
+        # Feedback is keyed by the queue item id, so it survives queue deletion.
+        feedback = db.scalars(
+            select(WorkoutFeedback).where(
+                WorkoutFeedback.workout_id == workout.plan_workout_id,
+                WorkoutFeedback.user_id == user.id,
+            )
+        ).first()
+
+    return WorkoutContextRead(
+        workout_id=workout.id,
+        plan_workout_id=workout.plan_workout_id,
+        queue_item=queue_item,
+        plan=plan,
+        feedback=feedback,
+    )
 
 
 @router.delete("/{workout_id}", status_code=status.HTTP_204_NO_CONTENT)
