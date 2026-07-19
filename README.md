@@ -69,7 +69,7 @@ If you left `BOOTSTRAP_ADMIN_PASSWORD` empty, logging in stays disabled and the 
 
 ### 4. Add your household
 
-One instance serves a household, Audiobookshelf-style: a handful of accounts, all data scoped per user, and no open registration — the admin creates every account.
+One instance serves a household: a handful of accounts, all data scoped per user, and no open registration — the admin creates every account.
 
 1. As `admin`, open **Users** and create an account for each athlete (role `user`).
 2. Each athlete signs into the **dashboard** with their username + password.
