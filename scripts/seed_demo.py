@@ -364,6 +364,14 @@ def main() -> None:
     ap.add_argument("--athlete-username", default="sofia")
     ap.add_argument("--athlete-password", default="sofia-demo")
     ap.add_argument("--seed", type=int, default=20260720)
+    ap.add_argument(
+        "--skip-workouts",
+        action="store_true",
+        help="Seed everything except recorded workout rows (plans, queue + completions, "
+        "feedback, health metrics, notes). For the combined simulator demo: the iOS app's "
+        "DEBUG seeder writes the same story into HealthKit and uploads it, so workout ids "
+        "match end-to-end. See docs/app-demo-seeder-handoff.md.",
+    )
     args = ap.parse_args()
 
     rng = random.Random(args.seed)
@@ -479,15 +487,16 @@ def main() -> None:
     # ── 12 weeks of pre-plan history (unplanned runs) ──
     n_workouts = 0
     history_km = [20, 21, 23, 24, 25, 21, 26, 27, 28, 24, 27, 28]  # gentle ramp, down weeks 6 + 10
-    for w, km in enumerate(history_km):
-        week_monday = history_start + timedelta(weeks=w)
-        quality = "tempo" if w % 2 else "easy"
-        for dow, (kind, dist) in week_plan(km, quality).items():
-            day = week_monday + timedelta(days=dow)
-            if day >= plan_start or rng.random() < 0.07:  # the odd missed run
-                continue
-            api.req("POST", "/api/workouts", make_run(day, (6, 45), kind, dist, pace_of(kind, day), rng))
-            n_workouts += 1
+    if not args.skip_workouts:
+        for w, km in enumerate(history_km):
+            week_monday = history_start + timedelta(weeks=w)
+            quality = "tempo" if w % 2 else "easy"
+            for dow, (kind, dist) in week_plan(km, quality).items():
+                day = week_monday + timedelta(days=dow)
+                if day >= plan_start or rng.random() < 0.07:  # the odd missed run
+                    continue
+                api.req("POST", "/api/workouts", make_run(day, (6, 45), kind, dist, pace_of(kind, day), rng))
+                n_workouts += 1
 
     # ── active plan: queue items + completed workouts, horizon = end of next week ──
     plan_km = [24, 27, 30, 22, 29, 31, 26, 18]
@@ -529,13 +538,14 @@ def main() -> None:
                 continue
             if day <= today:
                 api.req("PATCH", f"/api/queue/{item['id']}/status", {"status": "completed"})
-                api.req("POST", "/api/workouts", make_run(day, (6, 40), kind, dist, pace_of(kind, day), rng, plan_workout_id=item["id"]))
-                n_workouts += 1
                 n_done += 1
+                if not args.skip_workouts:
+                    api.req("POST", "/api/workouts", make_run(day, (6, 40), kind, dist, pace_of(kind, day), rng, plan_workout_id=item["id"]))
+                    n_workouts += 1
     print(f"queue: {n_queue} sessions ({n_done} completed, 1 skipped with feedback)")
 
     # ── strength (Hevy), flexibility (Bend), walks, one ride ──
-    for w in range(8):
+    for w in range(8 if not args.skip_workouts else 0):
         week_monday = monday0 - timedelta(weeks=8) + timedelta(weeks=w)
         for dow in STRENGTH_DAYS:
             day = week_monday + timedelta(days=dow)
@@ -545,7 +555,7 @@ def main() -> None:
                 day, (17, 30), "traditionalStrength", rng.uniform(42, 62), "com.hevyapp.hevy",
                 rng, kcal=rng.uniform(240, 380), with_hr=True, hr_base=112))
             n_workouts += 1
-    for w in range(10):
+    for w in range(10 if not args.skip_workouts else 0):
         week_monday = monday0 - timedelta(weeks=10) + timedelta(weeks=w)
         for dow, hm in ((3, (7, 15)), (6, (9, 0))):
             day = week_monday + timedelta(days=dow)
@@ -560,12 +570,15 @@ def main() -> None:
                 sunday, (15, 0), "walking", rng.uniform(45, 85), "com.apple.health",
                 rng, dist_km=rng.uniform(3.2, 6.5), kcal=rng.uniform(140, 260)))
             n_workouts += 1
-    ride_day = monday0 - timedelta(weeks=3) + timedelta(days=6)
-    api.req("POST", "/api/workouts", make_simple(
-        ride_day, (10, 0), "cycling", 92, "com.strava", rng,
-        dist_km=28.4, kcal=610, with_hr=True, hr_base=132))
-    n_workouts += 1
-    print(f"workouts: {n_workouts} total")
+    if not args.skip_workouts:
+        ride_day = monday0 - timedelta(weeks=3) + timedelta(days=6)
+        api.req("POST", "/api/workouts", make_simple(
+            ride_day, (10, 0), "cycling", 92, "com.strava", rng,
+            dist_km=28.4, kcal=610, with_hr=True, hr_base=132))
+        n_workouts += 1
+        print(f"workouts: {n_workouts} total")
+    else:
+        print("workouts: skipped — the app's HealthKit seed will upload them")
 
     # ── coaching notes ──
     notes = [
