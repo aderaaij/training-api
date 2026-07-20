@@ -113,6 +113,8 @@ make create_migration m="desc"   # Create new migration
 
 The API runs on port **8001**. Auth is per-user: `POST /api/auth/login` mints opaque `tapi_` bearer tokens (argon2 passwords, SHA-256-hashed tokens); only `/api/health` and `/api/auth/login` are unauthenticated.
 
+**Demo stack:** `docker compose -f docker-compose.demo.yml up -d && python3 scripts/seed_demo.py` boots a fully isolated demo instance on **:8011** (own compose project `training-api-demo`, own volume, hardcoded throwaway creds: `admin`/`demo-admin`, athlete `sofia`/`sofia-demo`) and seeds ~16 weeks of synthetic training through the public API (stdlib-only seeder, deterministic per `--seed`, anchored to today). The README screenshots are captures of exactly this seed. Reset: `docker compose -f docker-compose.demo.yml down -v`. The seeder creates the run plan *last* on purpose — plan-note context resolves to the most recently created active plan.
+
 **Configuration (since Phase 6, 2026-07-18):** a containerized install is configured entirely from the repo-root `.env` (template `.env.example`) — compose derives `DATABASE_URL` from the same `POSTGRES_*` variables the db service uses and passes `BOOTSTRAP_ADMIN_USERNAME`/`BOOTSTRAP_ADMIN_PASSWORD` through only when set. `backend/config/.env` is optional (compose `env_file` is `required: false`): it's for running the backend outside Docker, and on upgraded pre-auth installs it may still hold the legacy `API_KEY` (now optional in `Settings`; when present the seed migration registers it as an admin-owned token). First boot with no admin password logs a loud warning with the fix.
 
 ## Database

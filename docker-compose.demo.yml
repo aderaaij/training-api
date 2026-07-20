@@ -1,0 +1,50 @@
+# Disposable demo stack, fully isolated from a real deployment: its own
+# compose project name, its own postgres volume, its own port, and hardcoded
+# throwaway credentials. Nothing here reads the root .env.
+#
+#   docker compose -f docker-compose.demo.yml up -d
+#   python3 scripts/seed_demo.py
+#   # dashboard at http://localhost:8011 — admin/demo-admin, sofia/sofia-demo
+#
+# Reset (wipes the demo database):
+#   docker compose -f docker-compose.demo.yml down -v
+
+name: training-api-demo
+
+services:
+  db:
+    image: postgres:16
+    container_name: postgres__training-api-demo
+    environment:
+      POSTGRES_DB: loopback-demo
+      POSTGRES_USER: loopback-demo
+      POSTGRES_PASSWORD: loopback-demo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U loopback-demo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    image: ghcr.io/aderaaij/loopback-training-server:latest
+    pull_policy: missing
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: backend__training-api-demo
+    ports:
+      - "${DEMO_API_PORT:-8011}:8001"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+psycopg://loopback-demo:loopback-demo@db:5432/loopback-demo
+      - ENVIRONMENT=PRODUCTION
+      # Throwaway demo credentials — the seed script's defaults match these.
+      - BOOTSTRAP_ADMIN_USERNAME=admin
+      - BOOTSTRAP_ADMIN_PASSWORD=demo-admin
+
+volumes:
+  postgres_data:

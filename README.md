@@ -82,6 +82,25 @@ Passwords, per-device tokens (revoke one stolen device without touching the rest
 docker compose exec app python -m app.cli --help
 ```
 
+## Try it with demo data
+
+Want to see a filled-in dashboard before wiring up your own data? A disposable demo stack ships with the repo — its own compose project, database volume, and port, fully isolated from a real deployment:
+
+```bash
+docker compose -f docker-compose.demo.yml up -d
+python3 scripts/seed_demo.py        # stdlib only, no dependencies
+```
+
+The seeder creates a synthetic athlete and ~16 weeks of realistic training through the public API: runs with splits, heart rate, cadence and GPS routes along the Lisbon riverfront, Hevy-style strength sessions, daily health metrics, a completed and an active training plan with a strength schedule, queued watch sessions (one skipped, with feedback), and coaching notes. The screenshots above are this data.
+
+Then open `http://localhost:8011` and sign in as athlete `sofia` / `sofia-demo` (or admin `admin` / `demo-admin` for the management console). The seeder also prints an API token you can point an MCP client at.
+
+Tear it down (wipes the demo database, touches nothing else):
+
+```bash
+docker compose -f docker-compose.demo.yml down -v
+```
+
 ## Exposing the server
 
 The iOS app and dashboard just need to reach port 8001 — over HTTPS, or over HTTP on a network you trust. Options, safest first:
