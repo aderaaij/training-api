@@ -51,7 +51,7 @@ cd loopback-training-server
 cp .env.example .env
 ```
 
-Edit `.env` and set `BOOTSTRAP_ADMIN_PASSWORD` — the password for the first-run `admin` account. Everything else has a sensible default (the comments in the file explain each one).
+Everything in `.env` has a sensible default (the comments in the file explain each one) — for a first install you don't need to edit anything.
 
 ### 2. Start
 
@@ -59,13 +59,13 @@ Edit `.env` and set `BOOTSTRAP_ADMIN_PASSWORD` — the password for the first-ru
 docker compose up -d      # or: make up
 ```
 
-The first start pulls a prebuilt multi-arch image from GHCR (amd64/arm64; if the pull fails it builds from source instead, which takes a few minutes — `docker compose build` forces that), runs the database migrations, and creates the `admin` account. The API and dashboard are then at `http://localhost:8001` (verify with `curl http://localhost:8001/api/health`).
+The first start pulls a prebuilt multi-arch image from GHCR (amd64/arm64; if the pull fails it builds from source instead, which takes a few minutes — `docker compose build` forces that) and runs the database migrations. The API and dashboard are then at `http://localhost:8001` (verify with `curl http://localhost:8001/api/health`).
 
-### 3. Log in
+### 3. Create your admin account
 
-Open `http://localhost:8001` and sign in as `admin` with the password you set. Admins get the management console (Users + System); regular accounts get the training dashboard.
+Open `http://localhost:8001` — a fresh install greets you with a **setup screen**. Create the `admin` account there and you land signed in. Admins get the management console (Users + System); regular accounts get the training dashboard.
 
-If you left `BOOTSTRAP_ADMIN_PASSWORD` empty, logging in stays disabled and the container log tells you how to fix it (`docker compose logs app`).
+For headless or scripted installs, set `BOOTSTRAP_ADMIN_PASSWORD` in `.env` before the first start instead — the account is created at boot and the setup screen never appears. Either way, setup closes permanently once the admin has a password; if you ever lock yourself out, recovery is the CLI (`docker compose exec app python -m app.cli set-password admin`).
 
 ### 4. Add your household
 
@@ -109,13 +109,13 @@ The iOS app and dashboard just need to reach port 8001 — over HTTPS, or over H
 - **Reverse proxy:** put Caddy / nginx / Traefik with a real certificate in front and forward to `127.0.0.1:8001`.
 - **LAN only:** fine for trying it out, but the app syncs in the background, so a phone that leaves the house needs one of the options above.
 
-If the server ends up publicly reachable: login is rate-limited (5/min/IP), there is no registration endpoint, and the admin System screen shows an auth audit trail — but public exposure still means **strong passwords on every account**.
+If the server ends up publicly reachable: login is rate-limited (5/min/IP), there is no registration endpoint (the first-run setup endpoint closes permanently once the admin account exists), and the admin System screen shows an auth audit trail — but public exposure still means **strong passwords on every account**.
 
 ## Backups
 
 The server backs itself up. A nightly `pg_dump` (03:30 container time by default) is written into the `BACKUP_HOST_DIR` mount (default `./backups`), keeping the newest 30 dumps; if the server was off at backup time it catches up shortly after starting. Upgrades that include database migrations take an extra dump right before migrating. The admin **System** screen reports backup freshness (green < 26 h old) and has a **Back up now** button. Tune with `BACKUP_TIME`, `BACKUP_KEEP`, and `TZ` in `.env`.
 
-The dumps are plain `pg_dump | gzip` files — point `BACKUP_HOST_DIR` at (or sync it to) somewhere off-machine and you're covered. Restore with:
+The dumps are plain `pg_dump | gzip` files — point `BACKUP_HOST_DIR` at (or sync it to) somewhere off-machine and you're covered. One caveat for NAS setups: the **database volume itself must live on local disk** — Postgres data over NFS/SMB is the classic self-hoster corruption trap; syncing the dump directory to the NAS is the safe way to get backups off-machine. Restore with:
 
 ```bash
 gunzip -c <dump>.sql.gz | docker exec -i postgres__training-api psql -U training-api training-api
@@ -158,7 +158,7 @@ Everything is configured through environment variables in the root `.env` (read 
 
 | Variable | Default | Purpose |
 |----------|---------|---------|
-| `BOOTSTRAP_ADMIN_PASSWORD` | *(unset)* | First-run admin password; applied only while the admin has none, so rotating it later is a no-op |
+| `BOOTSTRAP_ADMIN_PASSWORD` | *(unset)* | Headless alternative to the browser setup screen: pre-sets the first-run admin password. Applied only while the admin has none, so rotating it later is a no-op |
 | `BOOTSTRAP_ADMIN_USERNAME` | `admin` | First-run admin username |
 | `POSTGRES_PASSWORD` / `POSTGRES_USER` / `POSTGRES_DB` | `training-api` | Database credentials (not published outside the compose network; also fed to the app as `DATABASE_URL`) |
 | `API_PORT` | `8001` | Host port for the API + dashboard |
@@ -196,6 +196,8 @@ All endpoints except `/api/health` and `/api/auth/login` require a `Bearer` toke
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| `GET` | `/api/auth/setup` | Whether first-run setup is open (`{"required": bool}`; unauthenticated) |
+| `POST` | `/api/auth/setup` | Create the first admin account (returns a signed-in session; 409 once an admin exists) |
 | `POST` | `/api/auth/login` | Log in, mint a per-device token (bad credentials → 401) |
 | `GET` | `/api/auth/me` | Current user + their tokens |
 | `POST` | `/api/auth/password` | Change own password (revokes every *other* token) |

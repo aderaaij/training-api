@@ -10,6 +10,21 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.2] — 2026-07-23
+
+### Added
+
+- **First-run setup screen.** A fresh install now greets the browser with a
+  create-admin-account screen instead of a dead login form: the dashboard
+  detects that no admin password exists (`GET /api/auth/setup`) and walks you
+  through creating the account (`POST /api/auth/setup`), landing you signed
+  in. The endpoints close permanently once a passworded admin exists — a
+  deactivated admin keeps them closed, and an existing passworded account can
+  never be taken over; lockout recovery stays the CLI. The POST is
+  rate-limited like login and completing setup shows up in the admin
+  auth-activity feed. `BOOTSTRAP_ADMIN_PASSWORD` works unchanged for
+  headless/scripted installs and skips the screen entirely.
+
 ## [0.1.1] — 2026-07-23
 
 ### Added

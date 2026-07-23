@@ -3,6 +3,7 @@ import {
   Database,
   Key,
   Prohibit,
+  ShieldCheck,
   ShieldWarning,
   SignIn,
   UserCircleMinus,
@@ -55,6 +56,8 @@ function eventView(e: AuthEventRow): { icon: Icon; text: string; tone: 'ok' | 'w
       return { icon: UserCircleMinus, text: `${actor} deactivated ${who}`, tone: 'bad' }
     case 'user_reactivated':
       return { icon: UserCirclePlus, text: `${actor} reactivated ${who}`, tone: 'ok' }
+    case 'setup_completed':
+      return { icon: ShieldCheck, text: `First-run setup — admin account “${who}” created`, tone: 'ok' }
     default:
       return { icon: ShieldWarning, text: `${e.event}${who !== 'unknown' ? ` — ${who}` : ''}`, tone: 'warn' }
   }

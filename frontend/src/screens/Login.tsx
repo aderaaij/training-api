@@ -1,23 +1,47 @@
 import { LockKey, WarningCircle } from '@phosphor-icons/react'
 import { LogoMark } from '../components/LogoMark'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { ApiError } from '../lib/api'
+import { ApiError, api } from '../lib/api'
 import { useAuth } from '../lib/auth'
+import type { LoginResponse, SetupStatus } from '../lib/types'
 import '../styles/login.css'
 
+/** 'checking' until GET /api/auth/setup answers — avoids flashing the wrong form. */
+type Mode = 'checking' | 'login' | 'setup'
+
 export function Login() {
-  const { user, login } = useAuth()
+  const { user, login, adoptSession } = useAuth()
   const navigate = useNavigate()
+  const [mode, setMode] = useState<Mode>('checking')
   const [username, setUsername] = useState('')
+  const [displayName, setDisplayName] = useState('')
   const [password, setPassword] = useState('')
+  const [confirm, setConfirm] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
+  useEffect(() => {
+    let cancelled = false
+    api
+      .get<SetupStatus>('/api/auth/setup')
+      .then((s) => {
+        if (cancelled) return
+        setMode(s.required ? 'setup' : 'login')
+        if (s.required) setUsername('admin')
+      })
+      .catch(() => {
+        if (!cancelled) setMode('login')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   if (user) return <Navigate to="/" replace />
 
-  async function onSubmit(e: FormEvent) {
+  async function onSubmitLogin(e: FormEvent) {
     e.preventDefault()
     if (!username.trim() || !password) {
       setError('Invalid username or password')
@@ -40,6 +64,56 @@ export function Login() {
     }
   }
 
+  async function onSubmitSetup(e: FormEvent) {
+    e.preventDefault()
+    if (!username.trim()) {
+      setError('Pick a username')
+      return
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters')
+      return
+    }
+    if (password !== confirm) {
+      setError('Passwords do not match')
+      return
+    }
+    setBusy(true)
+    setError(null)
+    try {
+      const res = await api.post<LoginResponse>(
+        '/api/auth/setup',
+        { username: username.trim(), password, displayName: displayName.trim() || undefined },
+        { auth: false },
+      )
+      adoptSession(res)
+      navigate('/', { replace: true })
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        // Bootstrap (or another browser) beat us to it — fall back to sign-in.
+        setMode('login')
+        setPassword('')
+        setConfirm('')
+        setError('Setup is already complete — sign in instead')
+      } else if (err instanceof ApiError && err.status === 429) {
+        setError('Too many attempts — wait a minute and try again')
+      } else if (err instanceof ApiError) {
+        setError(err.detail)
+      } else {
+        setError('Setup failed — is the server reachable?')
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const errorNote = error && (
+    <div className="login-error">
+      <WarningCircle size={15} weight="fill" />
+      {error}
+    </div>
+  )
+
   return (
     <div className="login-wrap">
       <div className="login-glow" />
@@ -54,7 +128,7 @@ export function Login() {
         />
       </svg>
 
-      <form className="login-card" onSubmit={onSubmit}>
+      <form className="login-card" onSubmit={mode === 'setup' ? onSubmitSetup : onSubmitLogin}>
         <span className="corner tl" />
         <span className="corner tr" />
         <span className="corner bl" />
@@ -71,40 +145,96 @@ export function Login() {
           </div>
         </div>
 
-        <div className="login-field-label">Username</div>
-        <input
-          className="login-input"
-          type="text"
-          autoComplete="username"
-          autoCapitalize="none"
-          value={username}
-          onChange={(e) => setUsername(e.target.value)}
-        />
-        <div className="login-field-label">Password</div>
-        <input
-          className="login-input"
-          type="password"
-          autoComplete="current-password"
-          style={{ marginBottom: 8 }}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-        />
+        {mode === 'setup' && (
+          <>
+            <div className="login-heading">Create your admin account</div>
+            <div className="login-note">
+              Fresh install — this account manages members and settings. Athlete accounts are
+              created by the admin afterwards.
+            </div>
 
-        {error && (
-          <div className="login-error">
-            <WarningCircle size={15} weight="fill" />
-            {error}
-          </div>
+            <div className="login-field-label">Username</div>
+            <input
+              className="login-input"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <div className="login-field-label">Display name (optional)</div>
+            <input
+              className="login-input"
+              type="text"
+              autoComplete="name"
+              placeholder="Admin"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+            />
+            <div className="login-field-label">Password</div>
+            <input
+              className="login-input"
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <div className="login-field-label">Confirm password</div>
+            <input
+              className="login-input"
+              type="password"
+              autoComplete="new-password"
+              style={{ marginBottom: 8 }}
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+            />
+
+            {errorNote}
+
+            <button className="login-submit" type="submit" disabled={busy}>
+              {busy ? 'Creating account…' : 'Create admin account'}
+            </button>
+
+            <div className="login-foot">
+              <LockKey size={14} />
+              This screen closes for good once the admin account exists
+            </div>
+          </>
         )}
 
-        <button className="login-submit" type="submit" disabled={busy}>
-          {busy ? 'Signing in…' : 'Sign in'}
-        </button>
+        {mode === 'login' && (
+          <>
+            <div className="login-field-label">Username</div>
+            <input
+              className="login-input"
+              type="text"
+              autoComplete="username"
+              autoCapitalize="none"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <div className="login-field-label">Password</div>
+            <input
+              className="login-input"
+              type="password"
+              autoComplete="current-password"
+              style={{ marginBottom: 8 }}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
 
-        <div className="login-foot">
-          <LockKey size={14} />
-          Accounts are created by your household admin
-        </div>
+            {errorNote}
+
+            <button className="login-submit" type="submit" disabled={busy}>
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+
+            <div className="login-foot">
+              <LockKey size={14} />
+              Accounts are created by your household admin
+            </div>
+          </>
+        )}
       </form>
     </div>
   )

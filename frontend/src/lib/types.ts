@@ -22,6 +22,11 @@ export interface LoginResponse {
   user: AuthUser
 }
 
+/** GET /api/auth/setup — true while no admin account has a password (fresh install). */
+export interface SetupStatus {
+  required: boolean
+}
+
 export interface ApiTokenInfo {
   id: string
   name: string

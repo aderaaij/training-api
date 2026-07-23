@@ -41,9 +41,10 @@ def cmd_bootstrap(_args: argparse.Namespace) -> None:
             user = db.scalar(select(User).where(User.username == username))
         if user is None or user.password_hash is None:
             print(
-                f"bootstrap: WARNING — admin '{username}' has no password and BOOTSTRAP_ADMIN_PASSWORD is not set.\n"
-                "           Dashboard/app login is disabled. Set BOOTSTRAP_ADMIN_PASSWORD in .env and restart,\n"
-                f"           or run: docker compose exec app python -m app.cli set-password {username}"
+                f"bootstrap: admin '{username}' has no password yet — open the dashboard in a browser\n"
+                "           to finish first-run setup (create the admin account there). Alternatively,\n"
+                "           set BOOTSTRAP_ADMIN_PASSWORD in .env and restart, or run:\n"
+                f"           docker compose exec app python -m app.cli set-password {username}"
             )
         else:
             print("bootstrap: BOOTSTRAP_ADMIN_PASSWORD not set — admin already configured, skipping.")

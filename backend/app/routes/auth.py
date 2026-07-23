@@ -12,7 +12,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
+from sqlalchemy.orm import Session
 
 from app.auth import CurrentUser, security
 from app.auth_events import client_ip, record_auth_event
@@ -112,6 +113,88 @@ def login(request: Request, body: LoginRequest, db: DbSession) -> LoginResponse:
         db, "login_success", username=username, user_id=user.id, ip=client_ip(request),
         detail={"device": token.name} if token.name else None,
     )
+    db.commit()
+    db.refresh(token)
+    return LoginResponse(token=raw, token_id=token.id, user=UserOut.model_validate(user))
+
+
+# ── first-run setup ──
+#
+# A fresh install has no admin password, so the login form is dead on arrival.
+# These two unauthenticated endpoints let the SPA detect that state and create
+# the admin account in the browser; they hard-close the moment a passworded
+# admin exists. Deliberately never 401 (the SPA wipes its token on any 401).
+
+
+class SetupStatusResponse(_CamelModel):
+    required: bool
+
+
+class SetupRequest(_CamelModel):
+    username: str = "admin"
+    password: str = Field(min_length=8)
+    display_name: str | None = None
+
+    @field_validator("username")
+    @classmethod
+    def _normalize_username(cls, v: str) -> str:
+        v = v.strip().lower()
+        if not (1 <= len(v) <= 32) or any(c.isspace() for c in v):
+            raise ValueError("username must be 1-32 characters with no whitespace")
+        return v
+
+
+_SETUP_LOCK_KEY = 0x4C6F6F70  # "Loop" — pg advisory lock serializing setup
+
+
+def _setup_required(db: Session) -> bool:
+    # True iff no admin has a password — active or not. A deactivated-but-
+    # passworded admin must NOT reopen setup (that install has data; lockout
+    # recovery is the CLI, not an open network endpoint).
+    return db.scalar(select(User.id).where(User.role == "admin", User.password_hash.is_not(None)).limit(1)) is None
+
+
+@router.get("/setup", response_model=SetupStatusResponse)
+def setup_status(db: DbSession) -> SetupStatusResponse:
+    return SetupStatusResponse(required=_setup_required(db))
+
+
+@router.post("/setup", response_model=LoginResponse)
+@limiter.limit("5/minute")
+def setup(request: Request, body: SetupRequest, db: DbSession) -> LoginResponse:
+    # The advisory xact lock (released on commit/rollback) serializes
+    # concurrent attempts, so the check + create below can't double-run.
+    db.execute(select(func.pg_advisory_xact_lock(_SETUP_LOCK_KEY)))
+    if not _setup_required(db):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Setup has already been completed")
+
+    display = (body.display_name or "").strip()
+    user = db.scalar(select(User).where(User.username == body.username))
+    if user is None:
+        user = User(
+            username=body.username,
+            display_name=display or body.username,
+            role="admin",
+            password_hash=hash_password(body.password),
+        )
+        db.add(user)
+        db.flush()  # assign user.id for the token + event rows
+    elif user.password_hash is None:
+        # Claim the seeded/bootstrap admin: set password, promote, reactivate.
+        user.password_hash = hash_password(body.password)
+        user.role = "admin"
+        user.is_active = True
+        if display:
+            user.display_name = display
+    else:
+        # A passworded (non-admin) account with that name exists — setup must
+        # not hijack it.
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
+
+    raw = generate_token()
+    token = ApiToken(user_id=user.id, token_hash=hash_token(raw), name="Web dashboard")
+    db.add(token)
+    record_auth_event(db, "setup_completed", username=user.username, user_id=user.id, ip=client_ip(request))
     db.commit()
     db.refresh(token)
     return LoginResponse(token=raw, token_id=token.id, user=UserOut.model_validate(user))
