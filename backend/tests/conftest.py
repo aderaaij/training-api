@@ -69,6 +69,9 @@ def wire(engine, session_factory, monkeypatch):
     # unless cleared.
     app.state.limiter.reset()
     main_module._rl_event_last.clear()
+    # Same reason for the token_rejected throttle: one shared client IP would
+    # let an unknown-token event in one test suppress them in every later one.
+    auth_module._reject_event_last.clear()
 
     with engine.begin() as c:
         for table in reversed(Base.metadata.sorted_tables):

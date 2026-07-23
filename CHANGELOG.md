@@ -10,6 +10,20 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.3] — 2026-07-23
+
+### Added
+
+- **Stranded-device visibility.** A device still presenting a revoked,
+  expired, or deactivated-account bearer token used to fail with silent 401s;
+  those rejections now appear as `token_rejected` events in the admin
+  auth-activity feed. Expired/inactive rejections name the user and token
+  ("alice's token 'iPhone' rejected — expired"); unknown tokens can't be
+  attributed and show a short token fingerprint instead, so repeats are
+  recognizable. Events are throttled per device (per source IP for unknown
+  tokens) to at most one per 6 hours, so a retrying device or a scanner can't
+  flood the feed.
+
 ## [0.1.2] — 2026-07-23
 
 ### Added

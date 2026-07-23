@@ -1,10 +1,13 @@
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select, update
+from sqlalchemy.orm import Session
 
+from app.auth_events import client_ip, record_auth_event
 from app.database import DbSession, SessionLocal
 from app.models.api_token import ApiToken
 from app.models.user import User
@@ -14,6 +17,40 @@ security = HTTPBearer()
 
 # Don't write last_used_at on every request — only if it's this stale.
 _TOUCH_INTERVAL = timedelta(minutes=5)
+
+# A stranded device (revoked/expired token, deactivated account) retries in
+# the background, so one dead token can 401 every few minutes for days. Audit
+# at most one token_rejected event per key per window — the key is the token
+# for expired/inactive (one stranded device = one clean signal) and the IP for
+# unknown tokens (a scanner rotating garbage tokens can't mint a row per
+# attempt). In-process state, same trade-off as the login rate-limit throttle
+# in main.py.
+_REJECT_EVENT_WINDOW_S = 6 * 3600.0
+_reject_event_last: dict[str, float] = {}
+
+
+def _record_rejection(
+    db: Session,
+    request: Request,
+    *,
+    reason: str,
+    key: str,
+    username: str | None = None,
+    user_id: Any = None,
+    detail: dict[str, Any] | None = None,
+) -> None:
+    now = time.monotonic()
+    last = _reject_event_last.get(key)
+    if last is not None and now - last < _REJECT_EVENT_WINDOW_S:
+        return
+    if len(_reject_event_last) > 1024:  # bound the map under a many-key flood
+        _reject_event_last.clear()
+    _reject_event_last[key] = now
+    # commit=True: the 401 path writes nothing else (same as login_failed).
+    record_auth_event(
+        db, "token_rejected", username=username, user_id=user_id, ip=client_ip(request),
+        detail={"reason": reason, **(detail or {})}, commit=True,
+    )
 
 
 def _touch_last_used(token_id, last_used_at: datetime | None, now: datetime) -> None:
@@ -27,19 +64,37 @@ def _touch_last_used(token_id, last_used_at: datetime | None, now: datetime) -> 
 
 
 def get_current_user(
+    request: Request,
     db: DbSession,
     credentials: Annotated[HTTPAuthorizationCredentials, Depends(security)],
 ) -> User:
-    token = db.scalar(select(ApiToken).where(ApiToken.token_hash == hash_token(credentials.credentials)))
+    token_hash = hash_token(credentials.credentials)
+    token = db.scalar(select(ApiToken).where(ApiToken.token_hash == token_hash))
     if token is None:
+        # Revoked or never existed — no row to attribute. The hash suffix lets
+        # the feed tell one dead token repeating from many different ones.
+        _record_rejection(
+            db, request, reason="unknown", key=f"ip:{client_ip(request)}",
+            detail={"token_hint": token_hash[-6:]},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or revoked token")
 
     now = datetime.now(timezone.utc)
     if token.expires_at is not None and token.expires_at < now:
+        _record_rejection(
+            db, request, reason="expired", key=f"token:{token.id}",
+            username=token.user.username, user_id=token.user_id,
+            detail={"name": token.name},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
 
     user = token.user
     if not user.is_active:
+        _record_rejection(
+            db, request, reason="inactive", key=f"token:{token.id}",
+            username=user.username, user_id=user.id,
+            detail={"name": token.name},
+        )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
     _touch_last_used(token.id, token.last_used_at, now)

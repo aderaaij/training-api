@@ -58,6 +58,26 @@ function eventView(e: AuthEventRow): { icon: Icon; text: string; tone: 'ok' | 'w
       return { icon: UserCirclePlus, text: `${actor} reactivated ${who}`, tone: 'ok' }
     case 'setup_completed':
       return { icon: ShieldCheck, text: `First-run setup — admin account “${who}” created`, tone: 'ok' }
+    case 'token_rejected': {
+      // A device still presenting a dead token. Expired/inactive resolve to a
+      // user (stranded household device, warn); unknown tokens don't (bad).
+      const reason = str(e.detail?.reason)
+      const hint = str(e.detail?.token_hint)
+      if (reason === 'expired' || reason === 'inactive') {
+        return {
+          icon: Key,
+          text: `${who}'s token${tokenName ? ` “${tokenName}”` : ''} rejected — ${
+            reason === 'expired' ? 'expired' : 'account inactive'
+          }`,
+          tone: 'warn',
+        }
+      }
+      return {
+        icon: ShieldWarning,
+        text: `Rejected unknown token${hint ? ` (…${hint})` : ''}`,
+        tone: 'bad',
+      }
+    }
     default:
       return { icon: ShieldWarning, text: `${e.event}${who !== 'unknown' ? ` — ${who}` : ''}`, tone: 'warn' }
   }
