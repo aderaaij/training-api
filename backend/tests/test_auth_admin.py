@@ -8,6 +8,7 @@ self-service token minting.
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.version import __version__
 
 
 def _client(token: str) -> TestClient:
@@ -241,7 +242,8 @@ def test_rate_limited_login_audits_once_per_window(client_admin, user_a):
 
 def test_system_status_shape(client_admin, user_a):
     body = client_admin.get("/api/admin/system").json()
-    assert set(body) == {"backup", "backupCount", "dbSizeBytes", "migrationHead", "counts"}
+    assert set(body) == {"appVersion", "backup", "backupCount", "dbSizeBytes", "migrationHead", "counts"}
+    assert body["appVersion"] == __version__
     assert body["dbSizeBytes"] > 0
     assert "users" in body["counts"] and body["counts"]["users"] >= 2
     # backup may or may not exist depending on env (the container mounts the NAS

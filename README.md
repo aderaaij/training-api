@@ -122,6 +122,30 @@ The Postgres volume is the only state worth backing up. A nightly `pg_dump` on t
 
 Point `BACKUP_HOST_DIR` in `.env` at that directory and the admin **System** screen reports backup freshness (green < 26 h old). Restore with `gunzip -c <dump>.sql.gz | docker exec -i postgres__training-api psql -U training-api training-api`.
 
+## Releases & upgrading
+
+Releases are git tags (`vX.Y.Z`) with notes in [CHANGELOG.md](CHANGELOG.md); each one publishes multi-arch Docker images to GHCR. Three kinds of image tags exist:
+
+| Image tag | Meaning |
+|-----------|---------|
+| `0.1.0` | An exact release — immutable |
+| `0.1` | The latest patch release of a minor line |
+| `latest` | Every push to `main` — may be ahead of any release |
+
+Compose runs `latest` by default. Once you depend on the server day-to-day, pin a release in `.env` — especially if something like Watchtower auto-pulls your containers, since `latest` tracks unreleased `main`:
+
+```bash
+IMAGE_TAG=0.1
+```
+
+To upgrade: skim the changelog, take a backup (see [Backups](#backups)), then
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+Database migrations run automatically on startup. The running version is reported by `GET /api/health` and on the admin **System** screen. Versioning is semantic, with the usual 0.x caveat: **breaking changes bump the minor version** until 1.0, so `0.1 → 0.2` deserves a changelog read while `0.1.x → 0.1.y` is always safe.
+
 ## Configuration
 
 Everything is configured through environment variables in the root `.env` (read by Docker Compose):
@@ -133,6 +157,7 @@ Everything is configured through environment variables in the root `.env` (read 
 | `POSTGRES_PASSWORD` / `POSTGRES_USER` / `POSTGRES_DB` | `training-api` | Database credentials (not published outside the compose network; also fed to the app as `DATABASE_URL`) |
 | `API_PORT` | `8001` | Host port for the API + dashboard |
 | `BACKUP_HOST_DIR` | `./backups` | Host directory with `pg_dump` files, mounted read-only for the System screen |
+| `IMAGE_TAG` | `latest` | Docker image tag for the app service — pin a release like `0.1` or `0.1.0` (see [Releases & upgrading](#releases--upgrading)) |
 
 Running the backend outside Docker reads `backend/config/.env` instead (template: `backend/config/.env.example`).
 
@@ -398,6 +423,18 @@ make create_migration m="add new column"
 # Backend tests (inside the container)
 docker compose exec app python -m pytest
 ```
+
+### Cutting a release (maintainers)
+
+1. Bump `__version__` in `backend/app/version.py` — the single source of truth (`pyproject.toml`, `/api/health`, and the dashboard all derive from it) — and add a `CHANGELOG.md` entry.
+2. Commit, then tag and push:
+
+   ```bash
+   git tag -a v0.1.0 -m "v0.1.0"
+   git push origin main v0.1.0
+   ```
+
+3. The [Docker workflow](.github/workflows/docker-publish.yml) builds and publishes `ghcr.io/aderaaij/loopback-training-server:{0.1.0, 0.1}`.
 
 ### Project Structure
 

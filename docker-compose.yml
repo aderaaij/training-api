@@ -19,8 +19,9 @@ services:
     # Prebuilt multi-arch image (amd64/arm64), published by CI. `pull_policy:
     # missing` makes a fresh install pull it instead of building from source;
     # `docker compose build` (or `up --build`) still builds locally from the
-    # same Dockerfile and is the fallback when the pull fails.
-    image: ghcr.io/aderaaij/loopback-training-server:latest
+    # same Dockerfile and is the fallback when the pull fails. Pin a release
+    # with IMAGE_TAG in .env (see README "Releases & upgrading").
+    image: ghcr.io/aderaaij/loopback-training-server:${IMAGE_TAG:-latest}
     pull_policy: missing
     build:
       context: .

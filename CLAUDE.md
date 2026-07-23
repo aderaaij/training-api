@@ -192,6 +192,8 @@ The MCP server (`mcp/`) exposes training data to Claude via FastMCP. It talks to
 
 Managed via Docker Compose. The backend container auto-runs migrations on startup.
 
+**Releases (since v0.1.0, 2026-07-23):** the version's single source of truth is `backend/app/version.py` (`pyproject.toml` reads it via hatchling; surfaced at `/api/health` and the admin System screen as `appVersion`). Cutting a release = bump it + CHANGELOG entry + `git tag -a vX.Y.Z` + push — the Docker workflow then publishes GHCR images tagged `X.Y.Z` and `X.Y` alongside `latest` (which tracks `main`). Compose pins via `IMAGE_TAG` in the root `.env` (default `latest`). SemVer with the 0.x caveat: breaking changes bump the minor.
+
 ```bash
 docker compose up -d --build     # Deploy changes
 docker compose logs -f backend   # Check logs

@@ -13,8 +13,9 @@ from app.auth_events import client_ip, record_auth_event
 from app.database import SessionLocal
 from app.rate_limit import limiter
 from app.routes import actions, admin, auth, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
+from app.version import __version__
 
-app = FastAPI(title="Training API", version="0.1.0")
+app = FastAPI(title="Training API", version=__version__)
 
 # React dashboard build (frontend/dist), baked into the image at /app/static.
 # Served same-origin so the existing Tailscale Funnel setup needs no CORS.

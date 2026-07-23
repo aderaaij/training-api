@@ -27,6 +27,7 @@ from app.models.health_metrics import DailyHealthMetrics
 from app.models.user import User
 from app.models.workout import Workout
 from app.security import hash_password
+from app.version import __version__
 
 router = APIRouter(dependencies=[Depends(get_current_admin)])
 
@@ -78,6 +79,7 @@ class BackupStatus(_CamelModel):
 
 
 class SystemStatus(_CamelModel):
+    app_version: str
     backup: BackupStatus | None
     backup_count: int
     db_size_bytes: int
@@ -311,6 +313,7 @@ def system_status(db: DbSession) -> SystemStatus:
         "authEvents": db.scalar(select(func.count(AuthEvent.id))) or 0,
     }
     return SystemStatus(
+        app_version=__version__,
         backup=backup,
         backup_count=backup_count,
         db_size_bytes=db_size,

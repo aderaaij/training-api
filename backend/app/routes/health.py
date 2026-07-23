@@ -2,6 +2,7 @@ from fastapi import APIRouter
 from sqlalchemy import text
 
 from app.database import DbSession
+from app.version import __version__
 
 router = APIRouter()
 
@@ -16,6 +17,6 @@ def health(db: DbSession):
 
     return {
         "service": "training-api",
-        "version": "0.1.0",
+        "version": __version__,
         "database": db_status,
     }

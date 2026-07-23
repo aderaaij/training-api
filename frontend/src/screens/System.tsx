@@ -101,7 +101,7 @@ export function System() {
                   {relTime(s.backup.completedAt)}
                 </div>
                 <div className="mono-meta sys-meta">
-                  {s.backup.file} · {fmtBytes(s.backup.sizeBytes)} · {s.backupCount} kept on NAS
+                  {s.backup.file} · {fmtBytes(s.backup.sizeBytes)} · {s.backupCount} kept
                 </div>
               </>
             ) : (
@@ -109,7 +109,7 @@ export function System() {
                 <div className="sys-big" style={{ color: 'var(--red)' }}>
                   none found
                 </div>
-                <div className="mono-meta sys-meta">expected nightly at 03:30 via training-api-backup.timer</div>
+                <div className="mono-meta sys-meta">no dumps in the mounted backup directory — see the README's Backups section</div>
               </>
             )}
           </div>
@@ -125,7 +125,7 @@ export function System() {
             <div className="mono-meta sys-meta">
               {s.counts.workouts ?? 0} workouts · {s.counts.healthDays ?? 0} health days · {s.counts.users ?? 0} users
               <br />
-              migration {s.migrationHead ?? 'unknown'}
+              v{s.appVersion} · migration {s.migrationHead ?? 'unknown'}
             </div>
           </div>
         </div>

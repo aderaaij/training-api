@@ -75,6 +75,7 @@ export interface AuthEventRow {
 }
 
 export interface SystemStatus {
+  appVersion: string
   backup: { file: string; sizeBytes: number; completedAt: string } | null
   backupCount: number
   dbSizeBytes: number

@@ -1,0 +1,44 @@
+# Changelog
+
+Notable changes to Loopback Server. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/) — with the usual 0.x caveat that
+**breaking changes bump the minor version** until 1.0.
+
+Each release `vX.Y.Z` is a git tag and publishes multi-arch Docker images
+tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
+The running server reports its version at `/api/health` and on the admin
+System screen.
+
+## [0.1.0] — 2026-07-23
+
+First tagged release — everything before this shipped straight from `main`.
+
+### Highlights
+
+- **Workout storage & analytics** for all HealthKit workout types (running,
+  cycling, strength, …) with splits, heart-rate samples, cadence, GPS routes,
+  and summary aggregation by week/month/year
+- **Apple Watch training queue**: structured workouts (intervals, pace alerts)
+  served as WorkoutKit compositions to the companion iOS app, with device
+  inventory, edit/delete actions, and missed-workout feedback
+- **Training plans** with goals, guardrails, and phases; recurring weekly
+  strength schedules; a unified calendar merging runs and strength sessions
+  with conflict flags; an explicit plan-completion flow
+- **Plan validation** — a deterministic schedule "linter": weekly-ramp and
+  taper checks, missing down weeks, back-to-back hard days, guardrail breaches
+- **Daily health metrics**: sleep, heart rate, HRV, weight, VO₂max, steps,
+  body composition
+- **Multi-user auth**: argon2 passwords, per-device revocable API tokens,
+  rate-limited login, and an auth audit trail
+- **Web dashboard** (React SPA served same-origin by the API): athlete screens
+  for overview/calendar/workouts/plans/notes/health/queue, plus an admin
+  console for user/token management and system monitoring
+- **MCP server** so any MCP client can act as an AI running coach over your
+  own data (stdio or streamable HTTP, per-user token passthrough, coaching
+  playbook)
+- **Self-host niceties**: single `.env` configuration, GHCR multi-arch images
+  (amd64/arm64), automatic migrations on startup, backup-freshness reporting,
+  and an isolated demo stack with a synthetic-athlete seeder
+
+[0.1.0]: https://github.com/aderaaij/loopback-training-server/releases/tag/v0.1.0

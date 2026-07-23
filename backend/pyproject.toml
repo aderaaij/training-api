@@ -1,6 +1,6 @@
 [project]
 name = "training-api"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Workout data store and training queue API"
 requires-python = ">=3.13"
 dependencies = [
@@ -20,6 +20,9 @@ test = ["pytest>=8"]
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "app/version.py"
 
 [tool.ruff]
 line-length = 120
