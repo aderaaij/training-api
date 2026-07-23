@@ -17,6 +17,7 @@ from fastmcp import FastMCP
 
 from app.schemas import NoteKind
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ plan_notes_router = FastMCP(name="Plan Notes Tools")
 
 
 @plan_notes_router.tool
+@text_result
 async def get_plan_context(
     plan_id: str | None = None,
     since_days: int = 60,
@@ -68,6 +70,7 @@ async def get_plan_context(
 
 
 @plan_notes_router.tool
+@text_result
 async def append_plan_note(
     kind: NoteKind,
     summary: str,
@@ -150,6 +153,7 @@ async def append_plan_note(
 
 
 @plan_notes_router.tool
+@text_result
 async def list_plan_notes(
     plan_id: str | None = None,
     kind: NoteKind | None = None,
@@ -191,6 +195,7 @@ async def list_plan_notes(
 
 
 @plan_notes_router.tool
+@text_result
 async def update_plan_note(
     note_id: str,
     kind: NoteKind | None = None,
@@ -234,6 +239,7 @@ async def update_plan_note(
 
 
 @plan_notes_router.tool
+@text_result
 async def delete_plan_note(note_id: str) -> dict | list:
     """Delete a plan note. Use only when the note was incorrect or
     duplicated. Prefer `update_plan_note` (or setting `expires_at` for

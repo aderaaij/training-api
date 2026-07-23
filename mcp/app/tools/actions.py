@@ -13,6 +13,7 @@ from app.schemas import (
     dump_step,
 )
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +21,7 @@ actions_router = FastMCP(name="Action Tools")
 
 
 @actions_router.tool
+@text_result
 async def get_device_workouts() -> dict | list:
     """
     Get the inventory of workouts currently scheduled on the user's Apple Watch.
@@ -39,6 +41,7 @@ async def get_device_workouts() -> dict | list:
 
 
 @actions_router.tool
+@text_result
 async def get_pending_actions() -> dict | list:
     """
     Get all pending workout actions (edits and deletes) waiting to be synced to Apple Watch.
@@ -55,6 +58,7 @@ async def get_pending_actions() -> dict | list:
 
 
 @actions_router.tool
+@text_result
 async def delete_scheduled_workout(workout_id: str) -> dict | list:
     """
     Delete a workout that has already been synced to the user's Apple Watch.
@@ -80,6 +84,7 @@ async def delete_scheduled_workout(workout_id: str) -> dict | list:
 
 
 @actions_router.tool
+@text_result
 async def edit_scheduled_workout(
     workout_id: str,
     display_name: str,
@@ -135,6 +140,7 @@ async def edit_scheduled_workout(
 
 
 @actions_router.tool
+@text_result
 async def batch_actions(actions: list[WorkoutActionItem]) -> dict | list:
     """
     Create multiple edit/delete actions in a single call.

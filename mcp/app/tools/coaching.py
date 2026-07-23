@@ -12,6 +12,7 @@ from typing import Literal
 from fastmcp import FastMCP
 
 from app.coaching import load_playbook
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,7 @@ Experience = Literal["beginner", "intermediate", "advanced"]
 
 
 @coaching_router.tool
+@text_result
 def get_coaching_playbook(
     goal: Goal | None = None,
     experience: Experience | None = None,

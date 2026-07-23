@@ -7,6 +7,7 @@ from fastmcp import FastMCP
 
 from app.schemas import PlanStatus, WeeklyDays
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ plans_router = FastMCP(name="Plan Tools")
 
 
 @plans_router.tool
+@text_result
 async def create_plan(
     name: str,
     activity_type: str,
@@ -64,6 +66,7 @@ async def create_plan(
 
 
 @plans_router.tool
+@text_result
 async def get_plan(plan_id: str) -> dict | list:
     """Get a training plan by ID, including its metadata.
 
@@ -71,7 +74,18 @@ async def get_plan(plan_id: str) -> dict | list:
         plan_id: UUID of the plan.
 
     Returns:
-        Plan object with name, activity_type, status, dates, description, metadata.
+        Plan object with name, activity_type, status, dates, description,
+        metadata, plus two computed fields:
+        - progress: session counts (total/completed/skipped/remaining) —
+          queued Apple Watch runs, plus scheduled strength sessions for plans
+          with a recurring schedule. A strength session counts as completed
+          when a synced Hevy workout landed on its date, skipped when the
+          date passed with no match, remaining otherwise. (The runs_* field
+          names predate strength support; they count sessions of either kind.)
+        - finishable: true when an active plan looks done (window passed, or
+          every session retired with ≥1 completed). Nothing auto-completes;
+          if true, offer the athlete a wrap-up (complete_plan on the dashboard
+          or update_plan status="completed").
     """
     try:
         return await client.get_plan(plan_id)
@@ -81,6 +95,7 @@ async def get_plan(plan_id: str) -> dict | list:
 
 
 @plans_router.tool
+@text_result
 async def list_plans(
     status: PlanStatus | None = None,
     activity_type: str | None = None,
@@ -92,7 +107,10 @@ async def list_plans(
         activity_type: Filter by activity type (e.g. "running").
 
     Returns:
-        List of plans, newest first.
+        List of plans, newest first. Each carries computed `progress` and
+        `finishable` — see get_plan for their semantics (progress counts
+        queued runs and scheduled strength sessions alike; finishable=true
+        means offer a wrap-up).
     """
     try:
         return await client.list_plans(status=status, activity_type=activity_type)
@@ -102,6 +120,7 @@ async def list_plans(
 
 
 @plans_router.tool
+@text_result
 async def update_plan(
     plan_id: str,
     name: str | None = None,
@@ -144,6 +163,7 @@ async def update_plan(
 
 
 @plans_router.tool
+@text_result
 async def get_plan_workouts(plan_id: str) -> dict | list:
     """Get all queued workouts belonging to a plan.
 
@@ -161,6 +181,7 @@ async def get_plan_workouts(plan_id: str) -> dict | list:
 
 
 @plans_router.tool
+@text_result
 async def set_strength_schedule(
     plan_id: str,
     start_date: str,
@@ -219,6 +240,7 @@ async def set_strength_schedule(
 
 
 @plans_router.tool
+@text_result
 async def get_plan_schedule(plan_id: str) -> dict | list:
     """Get a plan's recurring schedule expanded into concrete dated sessions.
 
@@ -237,6 +259,7 @@ async def get_plan_schedule(plan_id: str) -> dict | list:
 
 
 @plans_router.tool
+@text_result
 async def clear_plan_schedule(plan_id: str) -> dict | list:
     """Remove a plan's recurring weekly schedule.
 
@@ -254,6 +277,7 @@ async def clear_plan_schedule(plan_id: str) -> dict | list:
 
 
 @plans_router.tool
+@text_result
 async def validate_plan(plan_id: str) -> dict | list:
     """Deterministically check the athlete's upcoming schedule for soundness,
     using this plan's context (guardrails, race date from metadata).
@@ -271,6 +295,12 @@ async def validate_plan(plan_id: str) -> dict | list:
     items should at least be mentioned; `info` is context. `estimated: true`
     means the numbers rest on a pace assumption (time-based steps without a
     pace alert). Warnings never block anything.
+
+    Note `strength_collision` (info) fires for a hard run the day *after* a
+    strength session — an interference heads-up, deliberately broader than
+    the calendar's `conflict` flag, which only marks two sessions sharing a
+    date. A day-after warning here with conflict=false on the calendar is
+    consistent, not contradictory.
 
     Args:
         plan_id: UUID of the plan whose context (guardrails, race date)
@@ -291,6 +321,7 @@ async def validate_plan(plan_id: str) -> dict | list:
 
 
 @plans_router.tool
+@text_result
 async def get_training_calendar(
     date_from: str | None = None,
     date_to: str | None = None,
@@ -309,7 +340,9 @@ async def get_training_calendar(
     Returns:
         {from, to, entries[]} where each entry has: date, kind ("run" or
         "strength"), title, activityType, status, planId, planName, routineId,
-        completed, conflict.
+        completed, conflict. `conflict` marks same-day double-bookings only;
+        adjacent-day concerns (hard run right after a strength day) surface
+        through validate_plan instead.
     """
     try:
         return await client.get_training_calendar(date_from=date_from, date_to=date_to)

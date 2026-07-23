@@ -120,19 +120,33 @@ class TrainingClient:
         """Get splits for a workout."""
         return await self._request("GET", f"/api/workouts/{workout_id}/splits")
 
-    async def get_workout_heartrate(self, workout_id: str) -> list | dict:
-        """Get heart rate samples for a workout."""
-        return await self._request("GET", f"/api/workouts/{workout_id}/heartrate")
+    async def get_workout_heartrate(
+        self, workout_id: str, max_samples: int | None = None
+    ) -> list | dict:
+        """Get heart rate samples for a workout, optionally downsampled."""
+        params: dict[str, Any] = {}
+        if max_samples:
+            params["max_samples"] = max_samples
+        return await self._request("GET", f"/api/workouts/{workout_id}/heartrate", params=params)
 
     async def get_workout_summary(
         self,
         activity_type: str | None = None,
         period: str = "month",
+        start_after: str | None = None,
+        start_before: str | None = None,
+        limit: int | None = None,
     ) -> list | dict:
         """Get workout summary grouped by period."""
         params: dict[str, Any] = {"period": period}
         if activity_type:
             params["activity_type"] = activity_type
+        if start_after:
+            params["start_after"] = start_after
+        if start_before:
+            params["start_before"] = start_before
+        if limit:
+            params["limit"] = limit
         return await self._request("GET", "/api/workouts/summary", params=params)
 
     async def get_pending_queue(self) -> list | dict:

@@ -5,6 +5,7 @@ import logging
 from fastmcp import FastMCP
 
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -12,6 +13,7 @@ health_metrics_router = FastMCP("health-metrics")
 
 
 @health_metrics_router.tool()
+@text_result
 async def get_health_metrics(
     start_date: str,
     end_date: str | None = None,

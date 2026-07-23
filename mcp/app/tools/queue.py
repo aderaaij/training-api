@@ -16,6 +16,7 @@ from app.schemas import (
     dump_step,
 )
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ queue_router = FastMCP(name="Queue Tools")
 
 
 @queue_router.tool
+@text_result
 async def get_pending_workouts() -> dict | list:
     """
     Get all pending workout queue items waiting to be processed.
@@ -39,6 +41,7 @@ async def get_pending_workouts() -> dict | list:
 
 
 @queue_router.tool
+@text_result
 async def list_queued_workouts(
     status: QueueStatus | None = None,
     limit: int = 50,
@@ -67,6 +70,7 @@ async def list_queued_workouts(
 
 
 @queue_router.tool
+@text_result
 async def create_workout(
     activity_type: ActivityType,
     display_name: str,
@@ -179,6 +183,7 @@ async def create_workout(
 
 
 @queue_router.tool
+@text_result
 async def update_queued_workout(
     item_id: str,
     display_name: str | None = None,
@@ -265,6 +270,7 @@ async def update_queued_workout(
 
 
 @queue_router.tool
+@text_result
 async def update_workout_status(item_id: str, status: QueueStatus) -> dict | list:
     """
     Update the status of a queue item.
@@ -290,6 +296,7 @@ async def update_workout_status(item_id: str, status: QueueStatus) -> dict | lis
 
 
 @queue_router.tool
+@text_result
 async def batch_create_workouts(workouts: list[BatchWorkoutItem]) -> dict | list:
     """
     Queue multiple workouts for Apple Watch in a single call.

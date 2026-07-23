@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 
 from app.schemas import FeedbackAction
 from app.services.api_client import client
+from app.wire import text_result
 
 logger = logging.getLogger(__name__)
 
@@ -13,6 +14,7 @@ feedback_router = FastMCP(name="Feedback Tools")
 
 
 @feedback_router.tool
+@text_result
 async def get_workout_feedback(
     since: str | None = None,
     limit: int = 20,
@@ -41,6 +43,7 @@ async def get_workout_feedback(
 
 
 @feedback_router.tool
+@text_result
 async def get_missed_workouts() -> dict | list:
     """
     Get currently past-due, incomplete workouts that don't yet have feedback entries.

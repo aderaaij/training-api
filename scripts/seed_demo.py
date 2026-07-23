@@ -370,7 +370,7 @@ def main() -> None:
         help="Seed everything except recorded workout rows (plans, queue + completions, "
         "feedback, health metrics, notes). For the combined simulator demo: the iOS app's "
         "DEBUG seeder writes the same story into HealthKit and uploads it, so workout ids "
-        "match end-to-end. See docs/app-demo-seeder-handoff.md.",
+        "match end-to-end.",
     )
     args = ap.parse_args()
 
