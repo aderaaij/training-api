@@ -20,8 +20,10 @@ class PlanCreate(BaseModel):
 
 
 class PlanProgress(BaseModel):
-    """Queue-derived run counts. Strength sessions never queue, so a
-    schedule-only plan legitimately reports all zeros."""
+    """Session counts: queued runs plus, for plans with a recurring schedule,
+    scheduled strength sessions (completed = a strength workout synced in on
+    the session's date; skipped = the date passed unmatched). The runs_*
+    names predate strength support and count sessions of either kind."""
 
     runs_total: int = 0
     runs_completed: int = 0

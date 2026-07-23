@@ -176,6 +176,53 @@ def test_cross_user_cannot_complete(client_a, client_b):
     assert fetch_plan(client_a, pid)["status"] == "active"
 
 
+def test_strength_plan_progress_counts_scheduled_sessions(client_a):
+    """A schedule-only strength plan gets real progress: sessions resolved
+    from the recurring schedule, completed by date-matching synced strength
+    workouts, past unmatched dates counted as skipped."""
+    weekday = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")[TODAY.weekday()]
+    pid = make_plan(
+        client_a,
+        name="Lifting",
+        activity="strength",
+        start=TODAY - timedelta(days=14),
+        end=TODAY + timedelta(days=7),
+    )
+    r = client_a.put(
+        f"/api/plans/{pid}/schedule",
+        json={
+            "startDate": (TODAY - timedelta(days=14)).isoformat(),
+            "weeks": 3,
+            "days": {weekday: {"title": "Lower", "routineId": "hevy-abc"}},
+        },
+    )
+    assert r.status_code == 200
+
+    # One session per week on TODAY's weekday: TODAY-14, TODAY-7, TODAY.
+    # A Hevy-synced workout matches the first; the second passed unmatched.
+    r = client_a.post(
+        "/api/workouts",
+        json={
+            "id": str(uuid.uuid4()),
+            "activityType": "traditionalStrength",
+            "source": "com.hevyapp.hevy",
+            "startDate": (TODAY - timedelta(days=14)).isoformat() + "T18:00:00+00:00",
+            "endDate": (TODAY - timedelta(days=14)).isoformat() + "T19:00:00+00:00",
+            "duration": 3600,
+        },
+    )
+    assert r.status_code == 201
+
+    plan = fetch_plan(client_a, pid)
+    assert plan["progress"] == {
+        "runs_total": 3,
+        "runs_completed": 1,
+        "runs_skipped": 1,
+        "runs_remaining": 1,
+    }
+    assert plan["finishable"] is False  # today's session is still remaining
+
+
 def test_cross_user_runs_do_not_leak_into_progress(client_a, client_b):
     pid_a = make_plan(client_a, end=TODAY)
     add_run(client_a, pid_a, "completed")

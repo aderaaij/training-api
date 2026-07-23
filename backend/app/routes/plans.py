@@ -10,6 +10,8 @@ from app.models.plan import Plan
 from app.models.plan_note import PlanNote
 from app.models.queue import WorkoutQueue
 from app.models.user import User
+from app.models.workout import Workout
+from app.routes.schedule import STRENGTH_ACTIVITY
 from app.schedule_utils import resolve_sessions
 from app.schemas.plan import (
     PlanCompleteRequest,
@@ -30,13 +32,17 @@ from app.validation_service import run_validation
 router = APIRouter()
 
 
-def _progress_by_plan(db: DbSession, user: User, plan_ids: list[uuid.UUID]) -> dict[uuid.UUID, PlanProgress]:
-    """Run counts per plan from the queue, one grouped query for the batch."""
-    if not plan_ids:
+def _progress_by_plan(db: DbSession, user: User, plans: list[Plan]) -> dict[uuid.UUID, PlanProgress]:
+    """Session counts per plan: queued runs (one grouped query for the batch)
+    plus, for plans carrying a recurring schedule, the scheduled strength
+    sessions — completed when a strength workout landed on the session's date
+    (the same date-matching the calendar's `completed` flag uses), skipped
+    when the date passed unmatched, remaining otherwise."""
+    if not plans:
         return {}
     rows = db.execute(
         select(WorkoutQueue.plan_id, WorkoutQueue.status, func.count())
-        .where(WorkoutQueue.user_id == user.id, WorkoutQueue.plan_id.in_(plan_ids))
+        .where(WorkoutQueue.user_id == user.id, WorkoutQueue.plan_id.in_([p.id for p in plans]))
         .group_by(WorkoutQueue.plan_id, WorkoutQueue.status)
     ).all()
     out: dict[uuid.UUID, PlanProgress] = {}
@@ -49,13 +55,40 @@ def _progress_by_plan(db: DbSession, user: User, plan_ids: list[uuid.UUID]) -> d
             p.runs_skipped += count
         else:
             p.runs_remaining += count
+
+    sessions_by_plan = {p.id: resolve_sessions((p.metadata_ or {}).get("schedule")) for p in plans}
+    dates = [s["date"] for sessions in sessions_by_plan.values() for s in sessions]
+    if dates:
+        done_dates = {
+            start.date()
+            for start in db.scalars(
+                select(Workout.start_date).where(
+                    Workout.user_id == user.id,
+                    Workout.activity_type == STRENGTH_ACTIVITY,
+                    Workout.start_date >= datetime.combine(min(dates), time.min, tzinfo=timezone.utc),
+                    Workout.start_date <= datetime.combine(max(dates), time.max, tzinfo=timezone.utc),
+                )
+            )
+        }
+        today = datetime.now(timezone.utc).date()
+        for plan_id, sessions in sessions_by_plan.items():
+            for s in sessions:
+                p = out.setdefault(plan_id, PlanProgress())
+                p.runs_total += 1
+                if s["date"] in done_dates:
+                    p.runs_completed += 1
+                elif s["date"] < today:
+                    p.runs_skipped += 1
+                else:
+                    p.runs_remaining += 1
     return out
 
 
 def _is_finishable(plan: Plan, progress: PlanProgress, today: date) -> bool:
-    """An active plan that looks done: its window has passed, or every queued
-    run is retired (with at least one actually completed — a fully-skipped
-    plan the day it's created shouldn't celebrate)."""
+    """An active plan that looks done: its window has passed, or every session
+    (queued run or scheduled strength day) is retired, with at least one
+    actually completed — a fully-skipped plan the day it's created shouldn't
+    celebrate."""
     if plan.status != "active" or plan.start_date > today:
         return False
     window_over = plan.end_date is not None and plan.end_date < today
@@ -161,7 +194,7 @@ def list_plans(
         q = q.where(Plan.activity_type == activity_type)
 
     plans = db.scalars(q).all()
-    progress = _progress_by_plan(db, user, [p.id for p in plans])
+    progress = _progress_by_plan(db, user, plans)
     today = datetime.now(timezone.utc).date()
     return [_plan_read(p, progress.get(p.id, PlanProgress()), today) for p in plans]
 
@@ -169,7 +202,7 @@ def list_plans(
 @router.get("/{plan_id}", response_model=PlanRead)
 def get_plan(plan_id: uuid.UUID, db: DbSession, user: CurrentUser):
     plan = get_owned(db, Plan, plan_id, user)
-    progress = _progress_by_plan(db, user, [plan.id])
+    progress = _progress_by_plan(db, user, [plan])
     return _plan_read(plan, progress.get(plan.id, PlanProgress()), datetime.now(timezone.utc).date())
 
 
@@ -250,8 +283,7 @@ def complete_plan(plan_id: uuid.UUID, payload: PlanCompleteRequest, db: DbSessio
     db.commit()
     db.refresh(plan)
 
-    ids = [plan.id] + ([next_plan.id] if next_plan else [])
-    progress = _progress_by_plan(db, user, ids)
+    progress = _progress_by_plan(db, user, [plan] + ([next_plan] if next_plan else []))
     return PlanCompleteResponse(
         plan=_plan_read(plan, progress.get(plan.id, PlanProgress()), today),
         next_plan=_plan_read(next_plan, progress.get(next_plan.id, PlanProgress()), today) if next_plan else None,
