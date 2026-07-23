@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import delete, select
@@ -15,6 +16,11 @@ router = APIRouter()
 def sync_inventory(items: list[InventoryItem], db: DbSession, user: CurrentUser):
     """Replace this user's stored inventory with their full on-device snapshot."""
     incoming_ids = {item.id for item in items}
+    # One timestamp for the whole snapshot: synced_at means "last time the
+    # device reported this item", so it must move on update too — an in-place
+    # `complete` flip with a stale synced_at made the snapshot look older
+    # than the data it carried.
+    now = datetime.now(timezone.utc)
 
     # Delete THIS USER's items no longer on device (never touch other users' rows).
     db.execute(
@@ -39,6 +45,7 @@ def sync_inventory(items: list[InventoryItem], db: DbSession, user: CurrentUser)
             existing.hour = item.date.hour
             existing.minute = item.date.minute
             existing.complete = item.complete
+            existing.synced_at = now
         else:
             db.add(WorkoutInventory(
                 id=item.id,
@@ -50,6 +57,7 @@ def sync_inventory(items: list[InventoryItem], db: DbSession, user: CurrentUser)
                 hour=item.date.hour,
                 minute=item.date.minute,
                 complete=item.complete,
+                synced_at=now,
             ))
 
     db.commit()
