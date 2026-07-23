@@ -4,7 +4,7 @@ import { Navigate } from 'react-router-dom'
 import { usePageHeader } from '../components/PageHeader'
 import { ConfirmDialog, ErrorNote, Loading, Modal, SectionLabel } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { fmtDay, relTime } from '../lib/format'
+import { clientLabel, fmtDay, relTime } from '../lib/format'
 import {
   useAdminRevokeToken,
   useAdminUserTokens,
@@ -181,8 +181,9 @@ function UserTokensPanel({ user }: { user: AdminUserRow }) {
               <div className="t-name" style={{ fontSize: 13 }}>
                 {t.name || 'Unnamed token'}
               </div>
-              <div className="t-meta">
+              <div className="t-meta" title={t.lastUserAgent ?? undefined}>
                 last used {relTime(t.lastUsedAt)}
+                {clientLabel(t.lastUserAgent) ? ` · ${clientLabel(t.lastUserAgent)}` : ''}
                 {t.expiresAt ? ` · ${expired ? 'expired' : 'expires'} ${fmtDay(t.expiresAt)}` : ''}
               </div>
             </div>

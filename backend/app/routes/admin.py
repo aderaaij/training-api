@@ -60,6 +60,7 @@ class AdminTokenOut(_CamelModel):
     name: str
     created_at: datetime
     last_used_at: datetime | None
+    last_user_agent: str | None
     expires_at: datetime | None
 
 

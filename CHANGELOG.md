@@ -10,6 +10,20 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.4] — 2026-07-23
+
+### Added
+
+- **Per-token client visibility.** Each API token now remembers the last
+  client `User-Agent` seen on it (written alongside the existing throttled
+  `last_used_at` bookkeeping — an agent change, e.g. an app update, always
+  writes immediately). Token lists in the dashboard (admin Users screen and
+  own Settings) show a compact client label — e.g. `Loopback iOS 1.0`,
+  `browser` — with the full string on hover, and the `lastUserAgent` field is
+  on both token wire shapes. Groundwork for the iOS app's version handshake:
+  once the app sends `Loopback-iOS/<version>`, the admin can answer "which
+  devices still run an old app" before shipping a breaking change.
+
 ## [0.1.3] — 2026-07-23
 
 ### Added

@@ -53,13 +53,29 @@ def _record_rejection(
     )
 
 
-def _touch_last_used(token_id, last_used_at: datetime | None, now: datetime) -> None:
-    if last_used_at is not None and now - last_used_at < _TOUCH_INTERVAL:
+def _touch_last_used(
+    token_id,
+    last_used_at: datetime | None,
+    now: datetime,
+    user_agent: str | None,
+    prev_user_agent: str | None,
+) -> None:
+    # A changed User-Agent (app updated, different client) always writes —
+    # that transition is the version-handshake signal and it's rare.
+    if (
+        last_used_at is not None
+        and now - last_used_at < _TOUCH_INTERVAL
+        and user_agent == prev_user_agent
+    ):
         return
     # Separate session so this bookkeeping write never entangles with the
     # request's own transaction (which may commit or roll back independently).
     with SessionLocal() as s:
-        s.execute(update(ApiToken).where(ApiToken.id == token_id).values(last_used_at=now))
+        s.execute(
+            update(ApiToken)
+            .where(ApiToken.id == token_id)
+            .values(last_used_at=now, last_user_agent=user_agent)
+        )
         s.commit()
 
 
@@ -97,7 +113,8 @@ def get_current_user(
         )
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User is inactive")
 
-    _touch_last_used(token.id, token.last_used_at, now)
+    ua = (request.headers.get("user-agent") or "").strip()[:300] or None
+    _touch_last_used(token.id, token.last_used_at, now, ua, token.last_user_agent)
     return user
 
 

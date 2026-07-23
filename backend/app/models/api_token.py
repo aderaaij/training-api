@@ -20,6 +20,10 @@ class ApiToken(Base):
     name: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Last client User-Agent seen on this token (e.g. "Loopback-iOS/1.0") —
+    # the server half of the app version handshake: answers "which devices
+    # still run an old app" before shipping a breaking change.
+    last_user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     # NULL = long-lived (device tokens); dashboard cookies get a finite expiry.
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

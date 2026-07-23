@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { usePageHeader } from '../components/PageHeader'
 import { ConfirmDialog, ErrorNote, Loading, Modal, SectionLabel } from '../components/ui'
 import { useAuth } from '../lib/auth'
-import { fmtDayYear, relTime } from '../lib/format'
+import { clientLabel, fmtDayYear, relTime } from '../lib/format'
 import { useChangePassword, useMe, useMintToken, useRevokeToken } from '../lib/queries'
 import type { ApiTokenInfo } from '../lib/types'
 import '../styles/settings.css'
@@ -21,6 +21,8 @@ function tokenIcon(name: string): Icon {
 
 function tokenMeta(t: ApiTokenInfo): string {
   const parts = [`created ${fmtDayYear(t.createdAt)}`, `last used ${relTime(t.lastUsedAt)}`]
+  const client = clientLabel(t.lastUserAgent)
+  if (client) parts.push(client)
   if (t.expiresAt) {
     const expired = new Date(t.expiresAt).getTime() < Date.now()
     parts.push(`${expired ? 'expired' : 'expires'} ${fmtDayYear(t.expiresAt)}`)

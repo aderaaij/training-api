@@ -32,6 +32,8 @@ export interface ApiTokenInfo {
   name: string
   createdAt: string
   lastUsedAt: string | null
+  /** Last client User-Agent seen on this token (e.g. "Loopback-iOS/1.0"). */
+  lastUserAgent: string | null
   expiresAt: string | null
 }
 

@@ -100,6 +100,16 @@ export function relTime(iso: string | null | undefined): string {
   return fmtDay(iso)
 }
 
+/** Compact label for a token's last-seen client User-Agent, null when unknown. */
+export function clientLabel(ua: string | null | undefined): string | null {
+  if (!ua) return null
+  const app = ua.match(/^Loopback-iOS\/(\S+)/i)
+  if (app) return `Loopback iOS ${app[1]}`
+  if (ua.startsWith('Mozilla/')) return 'browser'
+  // "python-httpx/0.28.1 (…)" → "python-httpx": product name without version noise.
+  return ua.split(' ')[0].split('/')[0].slice(0, 24)
+}
+
 export function fmtBytes(n: number | null | undefined): string {
   if (n == null) return '—'
   if (n < 1024) return `${n} B`
