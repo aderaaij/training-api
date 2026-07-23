@@ -20,7 +20,7 @@ from app.schemas.workout import (
     WorkoutSummary,
 )
 from app.tenancy import get_owned
-from app.workout_summary import strip_samples
+from app.workout_summary import downsample_timed, round_floats, strip_samples
 
 router = APIRouter()
 
@@ -99,6 +99,9 @@ def workout_summary(
     user: CurrentUser,
     activity_type: str | None = None,
     period: str = Query(default="month", pattern="^(week|month|year)$"),
+    start_after: datetime | None = None,
+    start_before: datetime | None = None,
+    limit: int | None = Query(default=None, ge=1, le=500),
 ):
     trunc = func.date_trunc(period, Workout.start_date)
 
@@ -120,6 +123,15 @@ def workout_summary(
 
     if activity_type:
         q = q.where(Workout.activity_type == activity_type)
+    if start_after:
+        q = q.where(Workout.start_date >= start_after)
+    if start_before:
+        q = q.where(Workout.start_date <= start_before)
+    if limit:
+        # Rows are ordered newest-first, so a limit keeps the most recent
+        # (period × activity_type) rows and history stays reachable via
+        # start_before. Without it the response grows forever.
+        q = q.limit(limit)
 
     rows = db.execute(q).all()
     return [
@@ -127,11 +139,11 @@ def workout_summary(
             period=str(row.period),
             activity_type=row.activity_type,
             count=row.count,
-            total_distance=row.total_distance,
-            total_duration=row.total_duration,
-            avg_distance=float(row.avg_distance) if row.avg_distance else None,
-            avg_duration=float(row.avg_duration) if row.avg_duration else None,
-            total_energy_burned=row.total_energy_burned,
+            total_distance=round(row.total_distance, 1) if row.total_distance is not None else None,
+            total_duration=round(row.total_duration, 1) if row.total_duration is not None else None,
+            avg_distance=round(float(row.avg_distance), 1) if row.avg_distance else None,
+            avg_duration=round(float(row.avg_duration), 1) if row.avg_duration else None,
+            total_energy_burned=round(row.total_energy_burned, 1) if row.total_energy_burned is not None else None,
         )
         for row in rows
     ]
@@ -146,25 +158,41 @@ def get_workout(
 ):
     """Full workout detail. With `include_samples=false` the raw sample
     arrays in `data` (route GPS points, cadence, heart rate — ~600 kB for a
-    GPS run) are replaced by a compact `data.samplesSummary`."""
+    GPS run) are replaced by a compact `data.samplesSummary`, and float noise
+    is rounded away — root columns included, not just the blob."""
     workout = get_owned(db, Workout, workout_id, user)
     if include_samples:
         return workout
     read = WorkoutRead.model_validate(workout)
     read.data = strip_samples(read.data)
+    # The ORM float columns carry the same double-precision noise as the blob.
+    for name, value in list(read):
+        if isinstance(value, float):
+            setattr(read, name, round(value, 2))
     return read
 
 
 @router.get("/{workout_id}/splits")
 def get_workout_splits(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
     workout = get_owned(db, Workout, workout_id, user)
-    return workout.data.get("splits", workout.data.get("events", []))
+    return round_floats(workout.data.get("splits", workout.data.get("events", [])))
 
 
 @router.get("/{workout_id}/heartrate")
-def get_workout_heartrate(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
+def get_workout_heartrate(
+    workout_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    max_samples: int | None = Query(default=None, ge=16, le=5000),
+):
+    """Heart rate series. `max_samples` caps the series length by averaging
+    over evenly-sized buckets — a workout's sample count is otherwise bounded
+    only by its duration (a 3 h run is ~2000 samples)."""
     workout = get_owned(db, Workout, workout_id, user)
-    return workout.data.get("heartRate", workout.data.get("heartRateSamples", []))
+    samples = workout.data.get("heartRate", workout.data.get("heartRateSamples", []))
+    if max_samples and isinstance(samples, list):
+        samples = downsample_timed(samples, max_samples)
+    return samples
 
 
 @router.get("/{workout_id}/context", response_model=WorkoutContextRead)

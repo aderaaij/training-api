@@ -72,6 +72,72 @@ class TestStripSamples:
         assert out["samplesSummary"]["heartRate"] == {"count": 2}
 
 
+class TestStripEventsAndRounding:
+    """The stripped view also prunes redundant HealthKit events and rounds
+    float noise — activities carry mis-scoped copies of the top-level events,
+    and segment events duplicate what activities/splits already encode."""
+
+    def test_activity_event_copies_dropped(self):
+        data = {
+            "activities": [
+                {
+                    "events": [{"type": "segment", "startDate": "a", "endDate": "b", "metadata": {}}],
+                    "duration": 180.00056099891663,
+                    "metadata": {"WOIntervalStepKeyPath": "0.0.0"},
+                },
+                "junk",
+            ]
+        }
+        out = strip_samples(data)
+        assert "events" not in out["activities"][0]
+        assert out["activities"][0]["metadata"] == {"WOIntervalStepKeyPath": "0.0.0"}
+        assert out["activities"][1] == "junk"
+
+    def test_segment_events_pruned_pause_resume_kept(self):
+        data = {
+            "events": [
+                {"type": "segment", "startDate": "a", "endDate": "b", "metadata": {}},
+                {"type": "pause", "startDate": "c", "endDate": "c"},
+                {"type": "segment", "startDate": "d", "endDate": "e", "metadata": {}},
+                {"type": "resume", "startDate": "f", "endDate": "f"},
+            ]
+        }
+        assert [e["type"] for e in strip_samples(data)["events"]] == ["pause", "resume"]
+
+    def test_empty_event_metadata_dropped(self):
+        out = strip_samples({"events": [{"type": "pause", "metadata": {}, "startDate": "c"}]})
+        assert out["events"] == [{"type": "pause", "startDate": "c"}]
+
+    def test_floats_rounded_throughout(self):
+        data = {
+            "splits": [{"distance": 1000.2151937251687, "index": 1}],
+            "activities": [{"totalDistance": 431.8716320564927}],
+        }
+        out = strip_samples(data)
+        assert out["splits"][0] == {"distance": 1000.22, "index": 1}
+        assert out["activities"][0] == {"totalDistance": 431.87}
+
+    def test_whole_number_int_promoted_among_float_siblings(self):
+        # Swift's JSONEncoder writes a whole-number double without the
+        # fraction, so an exactly-60 s step arrives as int 60 while its
+        # siblings round to 60.0 — the field must keep one JSON type.
+        data = {"activities": [{"duration": 59.999801993370056}, {"duration": 60}]}
+        durations = [a["duration"] for a in strip_samples(data)["activities"]]
+        assert durations == [60.0, 60.0]
+        assert all(type(d) is float for d in durations)
+
+    def test_consistently_int_fields_stay_int(self):
+        data = {"splits": [{"index": 1, "distance": 1000}, {"index": 2, "distance": 1000}]}
+        out = strip_samples(data)
+        assert out["splits"] == data["splits"]
+        assert all(type(s["index"]) is int and type(s["distance"]) is int for s in out["splits"])
+
+    def test_input_not_mutated_by_pruning(self):
+        data = {"activities": [{"events": [1], "duration": 1.005}], "events": [{"type": "segment"}]}
+        strip_samples(data)
+        assert data == {"activities": [{"events": [1], "duration": 1.005}], "events": [{"type": "segment"}]}
+
+
 def _create_workout(client) -> str:
     workout_id = str(uuid.uuid4())
     payload = {
@@ -79,8 +145,8 @@ def _create_workout(client) -> str:
         "activityType": "running",
         "startDate": "2026-07-23T06:00:00Z",
         "endDate": "2026-07-23T06:45:00Z",
-        "duration": 2700.0,
-        "totalDistance": 6435.0,
+        "duration": 2656.854385972023,
+        "totalDistance": 6435.324887804791,
         "route": [_route_point(a, i) for i, a in enumerate([70.0, 74.0, 71.0])],
         "cadence": [{"value": 165.0, "timestamp": "2026-07-23T06:01:00Z"}],
         "heartRate": [{"value": 145, "timestamp": "2026-07-23T06:01:00Z"}],
@@ -108,11 +174,13 @@ class TestWorkoutDetailIncludeSamples:
         assert data["samplesSummary"]["route"]["count"] == 3
         assert data["samplesSummary"]["route"]["elevationGainM"] == 4.0
         assert data["samplesSummary"]["heartRate"]["max"] == 145
-        # Top-level fields are untouched by the flag.
-        assert body["total_distance"] == 6435.0
+        # The root float columns are rounded along with the blob.
+        assert body["duration"] == 2656.85
+        assert body["total_distance"] == 6435.32
 
         # The compact read must not have persisted anything: a default read
-        # afterwards still returns the full arrays.
-        data_again = client_a.get(f"/api/workouts/{workout_id}").json()["data"]
-        assert len(data_again["route"]) == 3
-        assert "samplesSummary" not in data_again
+        # afterwards still returns the full arrays and full precision.
+        again = client_a.get(f"/api/workouts/{workout_id}").json()
+        assert len(again["data"]["route"]) == 3
+        assert "samplesSummary" not in again["data"]
+        assert again["total_distance"] == 6435.324887804791
