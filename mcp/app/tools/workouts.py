@@ -71,7 +71,11 @@ async def get_workout_detail(workout_id: str) -> dict | list:
 
     Returns:
         Workout object with all fields including the nested data object
-        (which may contain splits, heart rate samples, etc.).
+        (splits, structured activities, events, metadata). The raw per-second
+        sample arrays (GPS route, cadence, heart rate — several hundred kB)
+        are replaced by data.samplesSummary: per-series count plus avg/min/max,
+        and elevation gain/loss for the route. Use get_workout_heartrate for
+        the raw heart rate series and get_workout_splits for splits.
 
         Includes effort_score (user-rated RPE 1–10 from Apple Watch effort prompt;
         primary signal of perceived effort) and estimated_effort_score (Apple's
@@ -80,7 +84,7 @@ async def get_workout_detail(workout_id: str) -> dict | list:
         estimates miss. Treat null as "no signal," not "low effort."
     """
     try:
-        return await client.get_workout(workout_id)
+        return await client.get_workout(workout_id, include_samples=False)
     except Exception as e:
         logger.exception(f"Error in get_workout_detail: {e}")
         return {"error": str(e)}
@@ -176,7 +180,7 @@ async def get_workout_activities(workout_id: str) -> dict | list:
         Returns an empty list if the workout has no structured activities.
     """
     try:
-        workout = await client.get_workout(workout_id)
+        workout = await client.get_workout(workout_id, include_samples=False)
         if isinstance(workout, dict):
             data = workout.get("data", {})
             if isinstance(data, dict):

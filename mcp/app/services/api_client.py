@@ -99,9 +99,14 @@ class TrainingClient:
             params["start_before"] = start_before
         return await self._request("GET", "/api/workouts", params=params)
 
-    async def get_workout(self, workout_id: str) -> list | dict:
-        """Get a single workout by ID."""
-        return await self._request("GET", f"/api/workouts/{workout_id}")
+    async def get_workout(self, workout_id: str, include_samples: bool = True) -> list | dict:
+        """Get a single workout by ID. With include_samples=False the backend
+        replaces the raw route/cadence/heart-rate arrays (~600 kB for a GPS
+        run) with a compact data.samplesSummary."""
+        params: dict[str, Any] = {}
+        if not include_samples:
+            params["include_samples"] = "false"
+        return await self._request("GET", f"/api/workouts/{workout_id}", params=params)
 
     async def get_workout_context(self, workout_id: str) -> list | dict:
         """Get plan linkage context (queue item, plan, feedback) for a workout."""

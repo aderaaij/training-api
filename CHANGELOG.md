@@ -10,6 +10,21 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.5] — 2026-07-23
+
+### Added
+
+- **Sample-free workout detail.** `GET /api/workouts/{id}?include_samples=false`
+  replaces the raw per-second arrays in `data` (GPS `route`, `cadence`,
+  `heartRate`) with a compact `data.samplesSummary` — per-series count and
+  avg/min/max, plus jitter-filtered elevation gain/loss for the route. A GPS
+  run's detail response shrinks from ~650 kB to a few kB. The MCP's
+  `get_workout_detail` and `get_workout_activities` now always request the
+  compact form (the full payload, doubled by MCP text+structured serialization,
+  exceeded 1 MB and broke LLM clients); `get_workout_heartrate` and
+  `get_workout_splits` still serve the raw series. The default response is
+  unchanged, so the dashboard's route map and charts are unaffected.
+
 ## [0.1.4] — 2026-07-23
 
 ### Added

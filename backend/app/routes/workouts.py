@@ -20,6 +20,7 @@ from app.schemas.workout import (
     WorkoutSummary,
 )
 from app.tenancy import get_owned
+from app.workout_summary import strip_samples
 
 router = APIRouter()
 
@@ -137,8 +138,21 @@ def workout_summary(
 
 
 @router.get("/{workout_id}", response_model=WorkoutRead)
-def get_workout(workout_id: uuid.UUID, db: DbSession, user: CurrentUser):
-    return get_owned(db, Workout, workout_id, user)
+def get_workout(
+    workout_id: uuid.UUID,
+    db: DbSession,
+    user: CurrentUser,
+    include_samples: bool = True,
+):
+    """Full workout detail. With `include_samples=false` the raw sample
+    arrays in `data` (route GPS points, cadence, heart rate — ~600 kB for a
+    GPS run) are replaced by a compact `data.samplesSummary`."""
+    workout = get_owned(db, Workout, workout_id, user)
+    if include_samples:
+        return workout
+    read = WorkoutRead.model_validate(workout)
+    read.data = strip_samples(read.data)
+    return read
 
 
 @router.get("/{workout_id}/splits")
