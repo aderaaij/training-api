@@ -133,6 +133,14 @@ export function useSystemStatus(enabled: boolean) {
   })
 }
 
+export function useBackupNow() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post<NonNullable<SystemStatus['backup']>>('/api/admin/backup'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['system-status'] }),
+  })
+}
+
 // ── calendar ──
 
 export function useCalendar(from: string, to: string) {

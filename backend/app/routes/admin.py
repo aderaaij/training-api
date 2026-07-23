@@ -19,6 +19,7 @@ from sqlalchemy import delete, func, inspect, select, text
 
 from app.auth import CurrentAdmin, get_current_admin
 from app.auth_events import record_auth_event
+from app.backup import BackupError, run_backup
 from app.config import get_settings
 from app.database import DbSession
 from app.models.api_token import ApiToken
@@ -319,4 +320,21 @@ def system_status(db: DbSession) -> SystemStatus:
         db_size_bytes=db_size,
         migration_head=migration_head,
         counts=counts,
+    )
+
+
+@router.post("/backup", response_model=BackupStatus)
+def backup_now(admin: CurrentAdmin) -> BackupStatus:
+    """The System screen's "Back up now". Sync route = runs in the threadpool,
+    so a slow pg_dump doesn't block the event loop. Works even with the
+    scheduler disabled — an explicit admin action."""
+    try:
+        path = run_backup(f"manual by {admin.username}")
+    except BackupError as e:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    stat = path.stat()
+    return BackupStatus(
+        file=path.name,
+        size_bytes=stat.st_size,
+        completed_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
     )

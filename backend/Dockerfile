@@ -33,8 +33,11 @@ COPY backend/ .
 
 FROM python:3.13-slim
 
+# postgresql-client provides pg_dump for server-managed backups (app/backup.py).
+# Trixie ships client 17, which dumps servers up to Postgres 17 — fine for the
+# compose default of postgres:16.
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 && \
+    apt-get install -y --no-install-recommends libpq5 postgresql-client && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

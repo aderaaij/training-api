@@ -45,6 +45,8 @@ services:
       # Throwaway demo credentials — the seed script's defaults match these.
       - BOOTSTRAP_ADMIN_USERNAME=admin
       - BOOTSTRAP_ADMIN_PASSWORD=demo-admin
+      # Disposable data — no backup dir is mounted, so don't schedule dumps.
+      - BACKUP_ENABLED=false
 
 volumes:
   postgres_data:

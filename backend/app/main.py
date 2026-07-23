@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 import time
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI, Request
@@ -10,12 +12,25 @@ from slowapi.errors import RateLimitExceeded
 
 from app.auth import get_current_user
 from app.auth_events import client_ip, record_auth_event
+from app.backup import run_scheduler
 from app.database import SessionLocal
 from app.rate_limit import limiter
 from app.routes import actions, admin, auth, feedback, health, health_metrics, inventory, plan_notes, plans, queue, schedule, workouts
 from app.version import __version__
 
-app = FastAPI(title="Training API", version=__version__)
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # Nightly-backup scheduler; exits on its own when backups are disabled or
+    # the backup dir isn't writable (see app/backup.py).
+    backup_task = asyncio.create_task(run_scheduler())
+    yield
+    backup_task.cancel()
+    with suppress(asyncio.CancelledError):
+        await backup_task
+
+
+app = FastAPI(title="Training API", version=__version__, lifespan=lifespan)
 
 # React dashboard build (frontend/dist), baked into the image at /app/static.
 # Served same-origin so the existing Tailscale Funnel setup needs no CORS.

@@ -194,6 +194,8 @@ Managed via Docker Compose. The backend container auto-runs migrations on startu
 
 **Releases (since v0.1.0, 2026-07-23):** the version's single source of truth is `backend/app/version.py` (`pyproject.toml` reads it via hatchling; surfaced at `/api/health` and the admin System screen as `appVersion`). Cutting a release = bump it + CHANGELOG entry + `git tag -a vX.Y.Z` + push — the Docker workflow then publishes GHCR images tagged `X.Y.Z` and `X.Y` alongside `latest` (which tracks `main`). Compose pins via `IMAGE_TAG` in the root `.env` (default `latest`). SemVer with the 0.x caveat: breaking changes bump the minor.
 
+**Server-managed backups (since v0.1.1):** `backend/app/backup.py` — nightly `pg_dump` at `BACKUP_TIME` (container time) into `BACKUP_DIR=/backups`, keeping `BACKUP_KEEP`; a catch-up dump after downtime; a pre-migration dump on startup when migrations are pending (`python -m app.backup pre-migrate` in `start.sh`, warn-don't-block); and `POST /api/admin/backup` behind the System screen's "Back up now". **This deployment disables all of it** — `docker-compose.override.yml` sets `BACKUP_ENABLED=false` and keeps the NAS mount `:ro`, because the host's `training-api-backup.timer` remains the canonical backup path here.
+
 ```bash
 docker compose up -d --build     # Deploy changes
 docker compose logs -f backend   # Check logs

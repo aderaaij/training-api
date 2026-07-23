@@ -113,14 +113,20 @@ If the server ends up publicly reachable: login is rate-limited (5/min/IP), ther
 
 ## Backups
 
-The Postgres volume is the only state worth backing up. A nightly `pg_dump` on the host is enough:
+The server backs itself up. A nightly `pg_dump` (03:30 container time by default) is written into the `BACKUP_HOST_DIR` mount (default `./backups`), keeping the newest 30 dumps; if the server was off at backup time it catches up shortly after starting. Upgrades that include database migrations take an extra dump right before migrating. The admin **System** screen reports backup freshness (green < 26 h old) and has a **Back up now** button. Tune with `BACKUP_TIME`, `BACKUP_KEEP`, and `TZ` in `.env`.
+
+The dumps are plain `pg_dump | gzip` files — point `BACKUP_HOST_DIR` at (or sync it to) somewhere off-machine and you're covered. Restore with:
+
+```bash
+gunzip -c <dump>.sql.gz | docker exec -i postgres__training-api psql -U training-api training-api
+```
+
+Prefer to manage backups yourself? Set `BACKUP_ENABLED=false`, mount the directory read-only (`:ro` in an override file), and run something like this on the host — the System screen reports freshness on whatever `training-api-*.sql.gz` files it finds either way:
 
 ```bash
 # crontab -e
 30 3 * * * docker exec postgres__training-api pg_dump -U training-api training-api | gzip > /path/to/backups/training-api-$(date +\%F).sql.gz
 ```
-
-Point `BACKUP_HOST_DIR` in `.env` at that directory and the admin **System** screen reports backup freshness (green < 26 h old). Restore with `gunzip -c <dump>.sql.gz | docker exec -i postgres__training-api psql -U training-api training-api`.
 
 ## Releases & upgrading
 
@@ -138,13 +144,13 @@ Compose runs `latest` by default. Once you depend on the server day-to-day, pin 
 IMAGE_TAG=0.1
 ```
 
-To upgrade: skim the changelog, take a backup (see [Backups](#backups)), then
+To upgrade: skim the changelog, then
 
 ```bash
 docker compose pull && docker compose up -d
 ```
 
-Database migrations run automatically on startup. The running version is reported by `GET /api/health` and on the admin **System** screen. Versioning is semantic, with the usual 0.x caveat: **breaking changes bump the minor version** until 1.0, so `0.1 → 0.2` deserves a changelog read while `0.1.x → 0.1.y` is always safe.
+Database migrations run automatically on startup, and an upgrade with pending migrations dumps the database first (see [Backups](#backups)). The running version is reported by `GET /api/health` and on the admin **System** screen. Versioning is semantic, with the usual 0.x caveat: **breaking changes bump the minor version** until 1.0, so `0.1 → 0.2` deserves a changelog read while `0.1.x → 0.1.y` is always safe.
 
 ## Configuration
 
@@ -156,7 +162,11 @@ Everything is configured through environment variables in the root `.env` (read 
 | `BOOTSTRAP_ADMIN_USERNAME` | `admin` | First-run admin username |
 | `POSTGRES_PASSWORD` / `POSTGRES_USER` / `POSTGRES_DB` | `training-api` | Database credentials (not published outside the compose network; also fed to the app as `DATABASE_URL`) |
 | `API_PORT` | `8001` | Host port for the API + dashboard |
-| `BACKUP_HOST_DIR` | `./backups` | Host directory with `pg_dump` files, mounted read-only for the System screen |
+| `BACKUP_HOST_DIR` | `./backups` | Host directory the server writes its `pg_dump` backups to (and reports freshness from) |
+| `BACKUP_ENABLED` | `true` | Server-managed backups: nightly dump, catch-up after downtime, pre-migration dump. `false` = bring your own (see [Backups](#backups)) |
+| `BACKUP_TIME` | `03:30` | Nightly backup time, container-local (set `TZ` to make it your local time) |
+| `BACKUP_KEEP` | `30` | How many dumps to keep — older `training-api-*.sql.gz` files in the backup dir are pruned |
+| `TZ` | UTC | Container timezone (e.g. `Europe/Lisbon`), used by `BACKUP_TIME` |
 | `IMAGE_TAG` | `latest` | Docker image tag for the app service — pin a release like `0.1` or `0.1.0` (see [Releases & upgrading](#releases--upgrading)) |
 
 Running the backend outside Docker reads `backend/config/.env` instead (template: `backend/config/.env.example`).

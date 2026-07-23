@@ -47,6 +47,13 @@ services:
       # (see backend/scripts/start.sh).
       - ENVIRONMENT=PRODUCTION
       - BACKUP_DIR=/backups
+      # Server-managed backups (nightly pg_dump + pre-migration dump). These
+      # pass through only when set in the root .env; defaults are enabled,
+      # 03:30 container time, keep 30. TZ makes BACKUP_TIME local time.
+      - BACKUP_ENABLED
+      - BACKUP_TIME
+      - BACKUP_KEEP
+      - TZ
       # First-run admin account (password applied only while the admin has
       # none — see README "Quick Start"). Set these in the root .env: they pass
       # through from there, and when unset the variables are absent in the
@@ -55,10 +62,12 @@ services:
       - BOOTSTRAP_ADMIN_USERNAME
       - BOOTSTRAP_ADMIN_PASSWORD
     volumes:
-      # Host dir holding DB backup dumps, so the admin System screen can report
-      # backup freshness. Point it at your real backup location via
-      # BACKUP_HOST_DIR or a docker-compose.override.yml.
-      - ${BACKUP_HOST_DIR:-./backups}:/backups:ro
+      # Backup dir: the server writes its own pg_dump files here (nightly +
+      # pre-migration + on demand from the System screen, which also reports
+      # freshness). Point it at your real backup location via BACKUP_HOST_DIR
+      # or a docker-compose.override.yml; add :ro and BACKUP_ENABLED=false to
+      # manage backups yourself.
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
     restart: unless-stopped
 
 volumes:

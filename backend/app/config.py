@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -19,9 +20,25 @@ class Settings(BaseSettings):
     api_key: str | None = None
     environment: str = "LOCAL"
     db_host: str | None = None
-    # Read-only mount of the NAS backup dir (docker-compose); the admin System
-    # screen reports the newest dump found here. Absent dir = "no backups".
+    # Backup dir mount (docker-compose); the admin System screen reports the
+    # newest dump found here. Absent dir = "no backups". When backup_enabled,
+    # the server also writes its own dumps here (see app/backup.py): nightly at
+    # backup_time (container-local), before pending migrations on startup, and
+    # on demand — keeping the newest backup_keep files. Installs that manage
+    # backups themselves (host cron into a read-only mount) set
+    # BACKUP_ENABLED=false; freshness reporting works either way.
     backup_dir: str = "/backups"
+    backup_enabled: bool = True
+    backup_time: str = "03:30"
+    backup_keep: int = Field(default=30, ge=1)
+
+    @field_validator("backup_time")
+    @classmethod
+    def _check_backup_time(cls, v: str) -> str:
+        hour, _, minute = v.partition(":")
+        if not (hour.isdigit() and minute.isdigit() and 0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+            raise ValueError("BACKUP_TIME must be HH:MM (24h)")
+        return v
     # First-run admin bootstrap (see app/cli.py:bootstrap). Password is applied
     # once, only if the admin has none yet; rotating the env var won't reset it.
     bootstrap_admin_username: str = "admin"

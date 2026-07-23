@@ -10,6 +10,26 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.1] — 2026-07-23
+
+### Added
+
+- **Server-managed backups.** The server now backs itself up: a nightly
+  `pg_dump` into the `/backups` mount (`BACKUP_TIME`, default 03:30 container
+  time; newest `BACKUP_KEEP` dumps retained, default 30), a catch-up backup
+  shortly after startup when the newest dump is stale, and — new safety net —
+  an automatic dump **right before pending database migrations** run on an
+  upgrade. The admin System screen gains a **Back up now** button
+  (`POST /api/admin/backup`). Set `BACKUP_ENABLED=false` to keep managing
+  backups yourself; freshness reporting works either way.
+
+### Changed
+
+- The compose `/backups` mount is read-write by default now (was `:ro`).
+  Host-managed setups should add `:ro` back in an override file alongside
+  `BACKUP_ENABLED=false`.
+- The Docker image includes `postgresql-client` (pg_dump).
+
 ## [0.1.0] — 2026-07-23
 
 First tagged release — everything before this shipped straight from `main`.
@@ -41,4 +61,5 @@ First tagged release — everything before this shipped straight from `main`.
   (amd64/arm64), automatic migrations on startup, backup-freshness reporting,
   and an isolated demo stack with a synthetic-athlete seeder
 
+[0.1.1]: https://github.com/aderaaij/loopback-training-server/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aderaaij/loopback-training-server/releases/tag/v0.1.0

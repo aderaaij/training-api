@@ -15,7 +15,7 @@ import { usePageHeader } from '../components/PageHeader'
 import { ErrorNote, Loading, SectionLabel } from '../components/ui'
 import { useAuth } from '../lib/auth'
 import { fmtBytes, relTime } from '../lib/format'
-import { useAuthEvents, useSystemStatus } from '../lib/queries'
+import { useAuthEvents, useBackupNow, useSystemStatus } from '../lib/queries'
 import type { AuthEventRow } from '../lib/types'
 import '../styles/settings.css'
 import '../styles/system.css'
@@ -71,6 +71,7 @@ export function System() {
   const isAdmin = user?.role === 'admin'
   const system = useSystemStatus(isAdmin)
   const events = useAuthEvents(isAdmin)
+  const backupNow = useBackupNow()
 
   usePageHeader('System', 'backups · database · auth activity')
 
@@ -112,6 +113,15 @@ export function System() {
                 <div className="mono-meta sys-meta">no dumps in the mounted backup directory — see the README's Backups section</div>
               </>
             )}
+            <button
+              className="btn-ghost"
+              style={{ marginTop: 12, padding: '7px 14px', fontSize: 12, alignSelf: 'flex-start' }}
+              disabled={backupNow.isPending}
+              onClick={() => backupNow.mutate()}
+            >
+              {backupNow.isPending ? 'Backing up…' : 'Back up now'}
+            </button>
+            {backupNow.error != null && <ErrorNote error={backupNow.error} />}
           </div>
 
           <div className="sys-card">
