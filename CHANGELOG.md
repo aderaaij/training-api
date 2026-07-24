@@ -10,6 +10,23 @@ tagged `X.Y.Z` and `X.Y` to GHCR (see README "Releases & upgrading").
 The running server reports its version at `/api/health` and on the admin
 System screen.
 
+## [0.1.6] — 2026-07-24
+
+### Fixed
+
+- **`POST /api/plan-notes` now accepts `kind: "feedback"`.** The plan-completion
+  flow wrote feedback notes ORM-side and the MCP's `append_plan_note` advertised
+  the kind, but the request schema's pattern predated it — so authoring one via
+  the API 422'd. Note kinds are now single-sourced in `NOTE_KINDS` (used by both
+  the create and update schemas).
+- **The MCP surfaces the API's error detail instead of a bare status code.**
+  A validation failure used to reach the LLM as an opaque
+  `Client error '422 Unprocessable Content'`, leaving it to retry the same
+  payload blindly. The MCP's HTTP client now parses the response body (including
+  FastAPI's field-level validation errors) into the raised message, e.g.
+  `Training API returned 422 for POST /api/plan-notes: summary: String should
+  have at most 280 characters`.
+
 ## [0.1.5] — 2026-07-23
 
 ### Added

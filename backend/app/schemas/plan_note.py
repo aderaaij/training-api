@@ -6,13 +6,16 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.schemas.plan import PlanRead
 
 
-VALID_KINDS = {"decision", "preference", "constraint", "life_context", "observation", "blocker"}
+# "feedback" is written by the plan-completion flow and may also be authored
+# directly (the MCP's append_plan_note advertises it).
+NOTE_KINDS = ("decision", "preference", "constraint", "life_context", "observation", "blocker", "feedback")
+_KIND_PATTERN = rf"^({'|'.join(NOTE_KINDS)})$"
 
 
 class PlanNoteCreate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    kind: str = Field(pattern=r"^(decision|preference|constraint|life_context|observation|blocker)$")
+    kind: str = Field(pattern=_KIND_PATTERN)
     summary: str = Field(min_length=1, max_length=280)
     body: str | None = None
     importance: int = Field(default=2, ge=1, le=3)
@@ -24,7 +27,7 @@ class PlanNoteCreate(BaseModel):
 class PlanNoteUpdate(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    kind: str | None = Field(default=None, pattern=r"^(decision|preference|constraint|life_context|observation|blocker)$")
+    kind: str | None = Field(default=None, pattern=_KIND_PATTERN)
     summary: str | None = Field(default=None, min_length=1, max_length=280)
     body: str | None = None
     importance: int | None = Field(default=None, ge=1, le=3)

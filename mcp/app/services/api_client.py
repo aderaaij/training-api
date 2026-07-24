@@ -11,6 +11,27 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _error_message(response: httpx.Response, method: str, path: str) -> str:
+    """Readable error including the backend's detail, so the calling LLM can
+    see *which* field failed (e.g. a 422's "summary: at most 280 characters")
+    instead of a bare status code it can only retry blindly against."""
+    try:
+        detail = response.json().get("detail")
+    except Exception:
+        detail = None
+    if isinstance(detail, list):
+        # FastAPI validation errors: [{loc: ["body", "summary"], msg: ...}, ...]
+        parts = []
+        for err in detail:
+            loc = ".".join(str(p) for p in err.get("loc", []) if p != "body")
+            msg = err.get("msg", "invalid")
+            parts.append(f"{loc}: {msg}" if loc else msg)
+        detail = "; ".join(parts)
+    if not detail:
+        detail = response.text[:300] or response.reason_phrase
+    return f"Training API returned {response.status_code} for {method} {path}: {detail}"
+
+
 class TrainingClient:
     """Client for interacting with Training REST API."""
 
@@ -68,7 +89,8 @@ class TrainingClient:
             if response.status_code == 404:
                 raise ValueError(f"Resource not found: {path}")
 
-            response.raise_for_status()
+            if response.status_code >= 400:
+                raise ValueError(_error_message(response, method, path))
             return response.json()
 
     async def _delete(self, path: str, noun: str) -> dict:
@@ -79,7 +101,8 @@ class TrainingClient:
             response = await http_client.request("DELETE", url, headers=headers)
             if response.status_code == 404:
                 raise ValueError(f"{noun} not found: {path}")
-            response.raise_for_status()
+            if response.status_code >= 400:
+                raise ValueError(_error_message(response, "DELETE", path))
             return {"deleted": path.rsplit("/", 1)[-1]}
 
     async def list_workouts(
